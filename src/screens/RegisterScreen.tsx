@@ -1,0 +1,300 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TextStyle,
+    ToastAndroid,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import API from '../utils/api';
+import { storage } from '../utils/storage';
+import { registerForPushNotificationsAsync } from '../utils/usePushNotifications';
+
+const RegisterScreen = () => {
+    const router = useRouter();
+    const params = useLocalSearchParams();
+
+    const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [fcmToken, setFcmToken] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+
+    const [form, setForm] = useState({
+        full_name: '',
+        email: '',
+        phone_number: '',
+        password: '',
+        role: (params.role as string) || 'admin',
+    });
+
+    // Logika Tombol Aktif
+    const isFormValid =
+        form.full_name.trim().length > 0 &&
+        form.email.trim().includes('@') && // Validasi email simpel
+        form.phone_number.length > 0 &&
+        form.password.length >= 6 &&
+        form.password === confirmPassword;
+
+    useEffect(() => {
+        getDeviceToken();
+    }, []);
+
+    const getDeviceToken = async () => {
+        try {
+            const result = await registerForPushNotificationsAsync();
+
+            if (result) {
+                let finalToken = "";
+
+                if (typeof result === 'object') {
+                    // Jika hasilnya objek (seperti yang kamu alami)
+                    // Kita coba ambil properti 'token' atau ekstrak dari 'endpoint'
+                    const rawToken = result.token || result.endpoint || "";
+
+                    if (rawToken.includes('/send/')) {
+                        // Ekstrak string setelah /send/
+                        finalToken = rawToken.split('/send/')[1];
+                    } else {
+                        finalToken = typeof result === 'object' ? JSON.stringify(result) : result;
+                    }
+                } else {
+                    // Jika sudah string
+                    if (result.includes('/send/')) {
+                        finalToken = result.split('/send/')[1];
+                    } else {
+                        finalToken = result;
+                    }
+                }
+
+                // console.log("✅ Token Bersih:", finalToken);
+                setFcmToken(finalToken);
+            } else {
+                setFcmToken("NO_TOKEN");
+            }
+        } catch (error) {
+            console.error("❌ Error Filter Token:", error);
+            setFcmToken("ERROR_TOKEN");
+        }
+    };
+
+    const handleRegister = async () => {
+        if (!isFormValid) return;
+
+        setLoading(true);
+
+        const payload = {
+            ...form,
+            fcm_token: fcmToken
+        };
+
+        try {
+            const response = await API.post('/auth/register', payload);
+
+            if (response.status === 201 || response.status === 200) {
+                const { token, user } = response.data;
+
+                // Simpan session
+                await Promise.all([
+                    storage.save('userToken', token),
+                    storage.save('userData', JSON.stringify(user))
+                ]);
+
+                // Langsung arahkan ke dashboard customer
+                router.replace('/(tabs)');
+            }
+        } catch (error) {
+            const errorMsg = "Koneksi ke server bermasalah";
+
+            if (Platform.OS === 'android') {
+                ToastAndroid.show(errorMsg, ToastAndroid.LONG);
+            } else if (Platform.OS === 'ios') {
+                Alert.alert("Gagal", errorMsg);
+            } else {
+                alert(errorMsg);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+    return (
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+            <View style={styles.topHeader}>
+                <TouchableOpacity onPress={() => router.back()}>
+                    <Ionicons name="arrow-back" size={24} color="#333" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Daftar</Text>
+                <View style={{ width: 24 }} />
+            </View>
+
+            <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+                <View style={styles.formSection}>
+
+                    {/* Nama Lengkap */}
+                    <Text style={styles.label}>Nama Lengkap</Text>
+                    <View style={styles.inputWrapper}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Masukkan nama lengkap"
+                            placeholderTextColor="#A0A0A0"
+                            autoCapitalize="words"
+                            value={form.full_name}
+                            onChangeText={(v) => setForm({ ...form, full_name: v })}
+                        />
+                    </View>
+                    <Text style={styles.hintText}>Contoh: Budi Santoso</Text>
+
+                    {/* Nomor Telepon */}
+                    <Text style={styles.label}>Nomor Telepon</Text>
+                    <View style={styles.inputWrapper}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Contoh: 08123xxxxx"
+                            placeholderTextColor="#A0A0A0"
+                            keyboardType="phone-pad"
+                            value={form.phone_number}
+                            onChangeText={(v) => setForm({ ...form, phone_number: v })}
+                            // TAMBAHKAN INI:
+                            maxLength={15} // Standar nomor HP biasanya 10-13 digit, 15 aman untuk cadangan
+                            returnKeyType="done"
+                            textContentType="telephoneNumber" // Membantu fitur auto-fill di iOS/Android
+                        />
+                    </View>
+                    <Text style={styles.hintText}>Contoh: 08123xxxxx</Text>
+
+                    {/* Email */}
+                    <Text style={styles.label}>Email</Text>
+                    <View style={styles.inputWrapper}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Masukkan email"
+                            placeholderTextColor="#A0A0A0"
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            value={form.email}
+                            onChangeText={(v) => setForm({ ...form, email: v.toLowerCase().trim() })}
+                        />
+                    </View>
+                    <Text style={styles.hintText}>Contoh: nama@email.com</Text>
+
+                    {/* Kata Sandi */}
+                    <Text style={styles.label}>Kata Sandi</Text>
+                    <View style={styles.inputWrapper}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Masukkan kata sandi"
+                            placeholderTextColor="#A0A0A0"
+                            secureTextEntry={!showPassword}
+                            value={form.password}
+                            onChangeText={(v) => setForm({ ...form, password: v })}
+                        />
+                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                            <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={22} color="#888" />
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={styles.hintText}>Minimal 6 karakter</Text>
+
+                    {/* Konfirmasi Kata Sandi */}
+                    <Text style={styles.label}>Konfirmasi Kata Sandi</Text>
+                    <View style={styles.inputWrapper}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Konfirmasi kata sandi"
+                            placeholderTextColor="#A0A0A0"
+                            secureTextEntry={!showConfirmPassword}
+                            value={confirmPassword}
+                            onChangeText={(v) => setConfirmPassword(v)}
+                        />
+                        <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                            <Ionicons name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} size={22} color="#888" />
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={styles.hintText}>Pastikan kata sandi anda sesuai</Text>
+
+                    {/* <TouchableOpacity
+                        style={[styles.btnAction, styles.btnOutline, { marginTop: 30 }]}
+                    >
+                        <Text style={styles.btnOutlineText}>Tambah Alamat</Text>
+                    </TouchableOpacity> */}
+
+                    <TouchableOpacity
+                        style={[styles.btnAction, isFormValid ? styles.btnActive : styles.btnDisabled]}
+                        onPress={handleRegister}
+                        disabled={!isFormValid || loading}
+                    >
+                        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnActionText}>Daftar</Text>}
+                    </TouchableOpacity>
+
+                    <View style={styles.termsContainer}>
+                        <Text style={styles.termsText}>
+                            Dengan klik <Text style={{ fontWeight: '700', color: '#333' }}>Daftar</Text>, saya menyetujui{' '}
+                            <Text style={styles.linkText}>kebijakan dan privasi</Text>
+                        </Text>
+                    </View>
+                </View>
+            </ScrollView>
+        </KeyboardAvoidingView>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#FFFFFF', paddingHorizontal: 20 },
+    topHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingTop: Platform.OS === 'ios' ? 50 : 20,
+        paddingBottom: 15,
+        backgroundColor: '#FFF',
+    },
+    headerTitle: { fontSize: 18, fontWeight: '700', color: '#333' },
+    formSection: { marginTop: 10 },
+    label: { fontSize: 16, fontWeight: '700', color: '#333', marginTop: 15, marginBottom: 8 },
+    inputWrapper: {
+        height: 55,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 15,
+        backgroundColor: '#FFF'
+    },
+    input: {
+        flex: 1, fontSize: 14, color: '#333',
+        paddingVertical: Platform.OS === 'web' ? 0 : 8,
+        ...Platform.select({ web: { outlineWidth: 0, outlineStyle: 'none', boxShadow: 'none' } as any, default: {} }),
+    } as TextStyle,
+    hintText: { fontSize: 12, color: '#A0A0A0', marginTop: 5, marginLeft: 2 },
+    btnAction: {
+        height: 55,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 15,
+    },
+    btnActive: { backgroundColor: '#633594' }, // Warna pink/ungu cerah sesuai gambar
+    btnDisabled: { backgroundColor: '#E0E0E0' },
+    btnActionText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+    btnOutline: {
+        borderWidth: 1.5,
+        borderColor: '#E91E63',
+        backgroundColor: '#FFF'
+    },
+    btnOutlineText: { color: '#E91E63', fontSize: 16, fontWeight: '700' },
+    termsContainer: { marginTop: 30, alignItems: 'center', paddingHorizontal: 10 },
+    termsText: { textAlign: 'center', fontSize: 13, color: '#888', lineHeight: 20 },
+    linkText: { color: '#00ACC1', textDecorationLine: 'underline' },
+});
+
+export default RegisterScreen;
