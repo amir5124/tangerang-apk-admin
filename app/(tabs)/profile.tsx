@@ -1,364 +1,158 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import {
-    ActivityIndicator,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
-} from 'react-native';
-import LogoutModal from '../../src/components/LogoutModal';
-import API from '../../src/utils/api';
-import { storage } from '../../src/utils/storage';
+import { Search } from "lucide-react-native";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TextInput, View } from "react-native";
+// Menggunakan instance api dari utils Anda
+import api from "../../src/utils/api";
 
-export default function ProfileScreen() {
-    const router = useRouter();
-    const [user, setUser] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-
-    useEffect(() => { loadUserData(); }, []);
-
-    const loadUserData = async () => {
-        try {
-            const rawData = await storage.get('userData');
-            if (rawData) {
-                const parsedData = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-                setUser(parsedData);
-            }
-        } catch (error) { console.error("❌ Gagal memuat profil:", error); }
-        finally { setLoading(false); }
-    };
-
-    const logoutAction = async () => {
-        try { await API.post('/auth/logout'); }
-        catch (error) { console.log("⚠️ Logout server skip"); }
-        finally {
-            await storage.delete('userToken');
-            await storage.delete('userData');
-            router.replace('/(auth)/login');
-        }
-    };
-
-    const handleLogout = () => {
-        setIsModalOpen(true);
-    };
-
-    // 3. Fungsi eksekusi final saat klik "Ya, Keluar!" di dalam modal
-    const confirmLogout = () => {
-        setIsModalOpen(false); // Tutup modal dulu
-        logoutAction();       // Jalankan fungsi logout kamu (hapus token, dll)
-    };
-
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#633594" />
-            </View>
-        );
-    }
-
-    return (
-        <SafeAreaView style={styles.mainWrapper}>
-
-
-            {/* Header Navbar */}
-            <View style={styles.navbar}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.navBtn}>
-                    <Ionicons name="arrow-back" size={24} color="#1E293B" />
-                </TouchableOpacity>
-                <Text style={styles.navTitle}>Profil Saya</Text>
-                <TouchableOpacity style={styles.navBtn}>
-                    <Ionicons name="settings-outline" size={24} color="#1E293B" />
-                </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-
-                {/* Profile Hero Section */}
-                <View style={styles.heroSection}>
-                    <View style={styles.avatarWrapper}>
-                        <Image
-                            source={{ uri: `https://ui-avatars.com/api/?name=${user?.full_name}&background=633594&color=fff&size=128` }}
-                            style={styles.avatar}
-                        />
-                        <TouchableOpacity style={styles.editBadge}>
-                            <Ionicons name="camera" size={16} color="#FFF" />
-                        </TouchableOpacity>
-                    </View>
-                    <Text style={styles.userNameText}>{user?.full_name || 'User TangerangFast'}</Text>
-
-                </View>
-
-                {/* Info Card */}
-                <View style={styles.infoCard}>
-                    <View style={styles.infoItem}>
-                        <View style={styles.iconCircle}>
-                            <Ionicons name="call" size={18} color="#633594" />
-                        </View>
-                        <View>
-                            <Text style={styles.infoLabel}>Nomor Telepon</Text>
-                            <Text style={styles.infoValue}>{user?.phone_number || '-'}</Text>
-                        </View>
-                    </View>
-                    <View style={styles.infoDivider} />
-                    <View style={styles.infoItem}>
-                        <View style={styles.iconCircle}>
-                            <Ionicons name="mail" size={18} color="#633594" />
-                        </View>
-                        <View>
-                            <Text style={styles.infoLabel}>Alamat Email</Text>
-                            <Text style={styles.infoValue}>{user?.email || '-'}</Text>
-                        </View>
-                    </View>
-                </View>
-
-                <View style={styles.fullStatsContainer}>
-                    <TouchableOpacity style={styles.wideStatItem} activeOpacity={0.8}>
-                        <View style={styles.statIconCircle}>
-                            <Ionicons name="wallet-outline" size={20} color="#633594" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.wideStatLabel}>Saldo Wallet</Text>
-                            <Text style={styles.wideStatValue}>Rp 0</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-                    </TouchableOpacity>
-
-
-                </View>
-
-                {/* Menu Section */}
-                <View style={styles.menuGroup}>
-                    <Text style={styles.groupLabel}>Aktivitas & Keamanan</Text>
-                    <MenuItem icon="heart-outline" label="Favorit Saya" />
-                    <MenuItem icon="time-outline" label="Riwayat Transaksi" />
-                    <MenuItem icon="shield-checkmark-outline" label="Ubah Password" />
-                    <MenuItem icon="help-buoy-outline" label="Pusat Bantuan" />
-
-                    <TouchableOpacity
-                        style={styles.logoutButton}
-                        onPress={handleLogout} // Memanggil handleLogout yang baru
-                        activeOpacity={0.7}
-                    >
-                        <Ionicons name="log-out-outline" size={22} color="#FF3B30" />
-                        <Text style={styles.logoutText}>Keluar dari Akun</Text>
-                    </TouchableOpacity>
-
-                    {/* Letakkan Modal di sini */}
-                    <LogoutModal
-                        visible={isModalOpen}
-                        onClose={() => setIsModalOpen(false)}
-                        onConfirm={confirmLogout} // Memanggil fungsi eksekusi logout
-                    />
-                </View>
-
-                <Text style={styles.versionText}>TangerangFast • v1.1.0</Text>
-                <View style={{ height: 40 }} />
-            </ScrollView>
-        </SafeAreaView>
-    );
+// 1. Definisi struktur data User
+interface User {
+  id: number;
+  full_name: string;
+  email: string;
+  phone_number: string;
+  role: "admin" | "mitra" | "customer";
+  fcm_token: string | null;
+  created_at: string;
+  store_name: string | null;
+  store_status: "pending" | "approved" | "rejected" | null;
+  store_category: string | null;
 }
 
-const MenuItem = ({ icon, label }: any) => (
-    <TouchableOpacity style={styles.menuItem} activeOpacity={0.6}>
-        <View style={styles.menuLeft}>
-            <View style={styles.menuIconBg}>
-                <Ionicons name={icon} size={20} color="#633594" />
-            </View>
-            <Text style={styles.menuLabel}>{label}</Text>
+const AdminUserList = () => {
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
+
+  const fetchUsers = async () => {
+    try {
+      // Menggunakan instance 'api' yang sudah Anda buat di utils
+      const response = await api.get("/users/admin/all-users");
+      if (response.data.success) {
+        setUsers(response.data.data);
+      }
+    } catch (error: any) {
+      console.error("❌ Gagal mengambil data user:", error.message);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchUsers();
+  };
+
+  const filteredUsers = users.filter((user) => user.full_name.toLowerCase().includes(search.toLowerCase()) || user.email.toLowerCase().includes(search.toLowerCase()));
+
+  // 2. SOLUSI ITEM MERAH: Tambahkan tipe data { item: User } di sini
+  const renderUserItem = ({ item }: { item: User }) => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={styles.userInfo}>
+          <Text style={styles.userName}>{item.full_name}</Text>
+          <Text style={styles.userEmail}>{item.email}</Text>
+          <Text style={styles.userPhone}>{item.phone_number}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-    </TouchableOpacity>
-);
+        <View
+          style={[
+            styles.roleBadge,
+            {
+              backgroundColor: item.role === "admin" ? "#e74c3c" : item.role === "mitra" ? "#3498db" : "#2ecc71",
+            },
+          ]}
+        >
+          <Text style={styles.roleText}>{item.role.toUpperCase()}</Text>
+        </View>
+      </View>
+
+      {item.role === "mitra" && (
+        <View style={styles.mitraInfo}>
+          <Text style={styles.storeName}>🏪 Toko: {item.store_name || "-"}</Text>
+          <Text style={[styles.statusText, { color: item.store_status === "approved" ? "green" : "orange" }]}>Status: {item.store_status || "pending"}</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Search size={20} color="#888" />
+        <TextInput style={styles.searchInput} placeholder="Cari nama atau email..." value={search} onChangeText={setSearch} />
+      </View>
+
+      <FlatList
+        data={filteredUsers}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderUserItem} // TypeScript sekarang tahu ini adalah { item: User }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListEmptyComponent={<Text style={styles.empty}>Tidak ada pengguna ditemukan.</Text>}
+      />
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
-    mainWrapper: { flex: 1, backgroundColor: '#F8FAFC' },
-    container: { flex: 1 },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF' },
-
-    navbar: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 15,
-        paddingVertical: 6,
-        backgroundColor: '#FFF',
-        // --- BORDER (Work on Android & iOS) ---
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9', // Warna abu-abu sangat muda agar elegan
-
-        // --- SHADOW UNTUK IOS ---
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-
-        // --- SHADOW UNTUK ANDROID ---
-        elevation: 3,
-    },
-    navTitle: { fontSize: 16, fontWeight: '700', color: '#1E293B' },
-    navBtn: { padding: 8, borderRadius: 10 },
-
-    heroSection: {
-        alignItems: 'center',
-        paddingVertical: 30,
-        backgroundColor: '#FFF',
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-    },
-    avatarWrapper: {
-        position: 'relative',
-        marginBottom: 15,
-    },
-    avatar: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        borderWidth: 4,
-        borderColor: '#F1F5F9',
-    },
-    editBadge: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
-        backgroundColor: '#633594',
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 3,
-        borderColor: '#FFF',
-    },
-    userNameText: { fontSize: 22, fontWeight: '800', color: '#1E293B' },
-    badgeRole: {
-        backgroundColor: '#F3E5F5',
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        borderRadius: 20,
-        marginTop: 6,
-    },
-    userRoleText: { fontSize: 10, fontWeight: '800', color: '#633594', letterSpacing: 1 },
-
-    infoCard: {
-        backgroundColor: '#FFF',
-        marginHorizontal: 20,
-        marginTop: -15,
-        borderRadius: 20,
-        padding: 20,
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-    },
-    infoItem: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-    iconCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#F3E5F5',
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    infoLabel: { fontSize: 12, color: '#94A3B8' },
-    infoValue: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
-    infoDivider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 15 },
-
-    statsGrid: {
-        flexDirection: 'row',
-        paddingHorizontal: 20,
-        gap: 15,
-        marginTop: 20
-    },
-    statItem: {
-        flex: 1,
-        backgroundColor: '#FFF',
-        padding: 15,
-        borderRadius: 15,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#F1F5F9'
-    },
-    statValue: { fontSize: 18, fontWeight: '800', color: '#633594' },
-    statLabel: { fontSize: 12, color: '#64748B', marginTop: 2 },
-
-    menuGroup: { paddingHorizontal: 20, marginTop: 25 },
-    groupLabel: { fontSize: 14, fontWeight: '700', color: '#94A3B8', marginBottom: 10, marginLeft: 5 },
-    menuItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 12,
-    },
-    menuLeft: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-    menuIconBg: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: '#F8FAFC',
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    menuLabel: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
-
-    logoutButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        marginTop: 30,
-        padding: 15,
-        borderRadius: 15,
-        backgroundColor: '#FFF1F0',
-    },
-    logoutText: { fontSize: 15, fontWeight: '700', color: '#FF3B30' },
-    fullStatsContainer: {
-        paddingHorizontal: 20,
-        marginTop: 20,
-        gap: 12, // Memberikan jarak antar box statistik
-    },
-    wideStatItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFF',
-        padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#F1F5F9',
-        // Efek bayangan halus
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-    },
-    statIconCircle: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: '#F3E5F5',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
-    wideStatLabel: {
-        fontSize: 12,
-        color: '#94A3B8',
-        fontWeight: '500',
-    },
-    wideStatValue: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: '#1E293B',
-        marginTop: 2,
-    },
-    versionText: { textAlign: 'center', color: '#CBD5E1', fontSize: 11, marginTop: 40 }
+  container: { flex: 1, backgroundColor: "#f8f9fa", padding: 10, paddingHorizontal: 15 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  searchContainer: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  searchInput: { flex: 1, marginLeft: 10 },
+  card: {
+    backgroundColor: "#fff",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+  },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between" },
+  userInfo: { flex: 1 },
+  userName: { fontSize: 16, fontWeight: "bold", color: "#333" },
+  userEmail: { fontSize: 14, color: "#666" },
+  userPhone: { fontSize: 14, color: "#888" },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 5,
+    alignSelf: "flex-start",
+  },
+  roleText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
+  mitraInfo: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+  },
+  storeName: { fontSize: 13, fontWeight: "600", color: "#444" },
+  statusText: { fontSize: 12, fontWeight: "bold", marginTop: 2 },
+  empty: { textAlign: "center", marginTop: 20, color: "#888" },
 });
+
+export default AdminUserList;
