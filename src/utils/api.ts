@@ -1,27 +1,26 @@
-import axios from 'axios';
-import { storage } from '../utils/storage'; // Pastikan path benar
+import axios from "axios";
+import { storage } from "../utils/storage";
 
 const API = axios.create({
-    baseURL: 'https://backend.tangerangfast.online/api',
-    timeout: 10000,
-    headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-    },
+  baseURL: "https://backend.tangerangfast.online/api",
+  timeout: 10000,
+  headers: {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  },
 });
 
-// Tambahkan Interceptor untuk menyisipkan token secara otomatis
 API.interceptors.request.use(
-    async (config) => {
-        const token = await storage.get('userToken');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
+  async (config) => {
+    const token = await storage.get("userToken");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  },
 );
 
 export default API;

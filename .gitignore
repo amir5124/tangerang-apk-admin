@@ -42,3 +42,6 @@ yarn-error.*
 
 # Firebase configuration
 google-services.json
+
+# Local Netlify folder
+.netlify

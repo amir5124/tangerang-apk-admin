@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { storage } from '../utils/storage'; // Pastikan path benar
+import { storage } from '../utils/storage';
 
 const API = axios.create({
     baseURL: 'https://backend.tangerangfast.online/api',
@@ -10,7 +10,6 @@ const API = axios.create({
     },
 });
 
-// Tambahkan Interceptor untuk menyisipkan token secara otomatis
 API.interceptors.request.use(
     async (config) => {
         const token = await storage.get('userToken');

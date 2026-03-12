@@ -9,8 +9,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast, { BaseToast, ErrorToast, ToastConfig } from "react-native-toast-message";
+import "../global.css";
 
-// 1. FIREBASE (Hanya inisialisasi dasar, Messaging dinonaktifkan di Web)
 import { getApps, initializeApp } from "firebase/app";
 
 const firebaseConfig = {
@@ -26,22 +26,16 @@ if (getApps().length === 0) {
   initializeApp(firebaseConfig);
 }
 
-/**
- * 2. NOTIFICATION HANDLER (Foreground)
- */
 Notifications.setNotificationHandler({
   handleNotification: async () =>
     ({
-      shouldShowAlert: false, // Handle via Toast
+      shouldShowAlert: false,
       shouldPlaySound: true,
       shouldSetBadge: true,
       priority: Notifications.AndroidImportance.MAX,
     }) as any,
 });
 
-/**
- * 3. CUSTOM TOAST CONFIGURATION
- */
 const toastConfig: ToastConfig = {
   success: (props) => <BaseToast {...props} style={styles.toastBase} contentContainerStyle={styles.toastContent} text1Style={styles.toastText1} text2Style={styles.toastText2} />,
   error: (props) => (
@@ -55,9 +49,6 @@ const toastConfig: ToastConfig = {
   ),
 };
 
-/**
- * 4. CONNECTION BANNER
- */
 const ConnectionBanner = () => {
   const [isConnected, setIsConnected] = useState<boolean | null>(true);
   useEffect(() => {
@@ -76,9 +67,6 @@ const ConnectionBanner = () => {
   );
 };
 
-/**
- * 5. ROOT LAYOUT CONTENT
- */
 function RootLayoutContent() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -86,13 +74,11 @@ function RootLayoutContent() {
   const responseListener = useRef<any>(null);
 
   useEffect(() => {
-    // Jalankan registrasi hanya di Native
     if (Platform.OS !== "web") {
       registerForPushNotificationsAsync().then((token) => {
         if (token) console.log("✅ Native Push Token:", token);
       });
 
-      // Listener Notifikasi Masuk (Foreground)
       notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
         const { title, body, data } = notification.request.content;
         Toast.show({
@@ -103,7 +89,6 @@ function RootLayoutContent() {
         });
       });
 
-      // Listener Notifikasi Diklik
       responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data;
         handleRedirect(data);
@@ -155,11 +140,7 @@ export default function RootLayout() {
   );
 }
 
-/**
- * 6. HELPER REGISTER (HANYA UNTUK ANDROID/IOS)
- */
 async function registerForPushNotificationsAsync(): Promise<string | undefined> {
-  // Cegah eksekusi di Web sama sekali
   if (Platform.OS === "web") return undefined;
 
   let token: string | undefined;
