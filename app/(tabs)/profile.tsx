@@ -62,7 +62,7 @@ export default function AdminUserList() {
   }, [users, search, activeTab]);
 
   const renderUserItem = ({ item }: { item: any }) => (
-    <View className="bg-white p-4 rounded-[10px] mb-4 border border-gray-100 shadow-sm mx-4">
+    <View className="bg-white p-4 rounded-[10px] mb-4 mx-4">
       <View className="flex-row items-center">
         <View className="w-12 h-12 rounded-full bg-slate-500 justify-center items-center">
           <Text className="text-white font-bold text-lg">{getInitials(item.full_name || "NA")}</Text>
@@ -104,18 +104,23 @@ export default function AdminUserList() {
 
   return (
     <View className="flex-1 bg-[#F5F7FA]">
-      {/* Header dengan tombol Logout */}
-      <View className="bg-white px-6 pt-12 pb-6 rounded-b-[30px] mb-2">
-        <View className="flex-row justify-between items-center mb-4">
-          <Text className="text-2xl font-bold text-gray-800">Manajemen Pengguna</Text>
-          <Pressable onPress={handleLogout} className="p-2 bg-red-50 rounded-full">
-            <LogOut size={20} color="#ef4444" />
+      <View className="bg-white px-4 pt-12 pb-6 mb-4 ">
+        {/* Bagian Judul dan Logout dalam satu baris */}
+        <View className="flex-row justify-between items-start mb-4">
+          <View>
+            <Text className="text-2xl font-bold text-gray-800">Kontrol Pengguna</Text>
+            <Text className="text-gray-400 text-sm">Kelola dan approval status</Text>
+          </View>
+
+          <Pressable onPress={handleLogout} className="p-2.5 bg-red-50 rounded-2xl active:bg-red-100">
+            <LogOut size={22} color="#ef4444" />
           </Pressable>
         </View>
 
-        <View className="flex-row bg-[#F5F7FA] rounded-2xl px-4 py-1 items-center">
+        {/* Search Bar */}
+        <View className="flex-row bg-[#F5F7FA] rounded-2xl px-4 py-3 items-center">
           <Search size={20} color="#94a3b8" />
-          <TextInput className="flex-1 ml-3 text-sm" placeholder="Cari nama atau email..." value={search} onChangeText={setSearch} />
+          <TextInput className="flex-1 ml-3 text-sm text-gray-700" placeholder="Cari nama atau email..." value={search} onChangeText={setSearch} />
         </View>
       </View>
 

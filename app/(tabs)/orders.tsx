@@ -60,8 +60,8 @@ export default function HomeScreen() {
   const renderItem = ({ item }: { item: Order }) => {
     const statusInfo = getStatusDetails(item.status);
     return (
-      <Pressable className="bg-white p-4 mx-4 mb-3 rounded-2xl border border-gray-100 shadow-sm" onPress={() => router.push(`/order/${item.id}` as any)}>
-        <View className="flex-row justify-between items-center mb-3">
+      <Pressable className="bg-white p-4 mx-4 rounded-[10px] mt-3" onPress={() => router.push(`/order/${item.id}` as any)}>
+        <View className="flex-row justify-between items-center mb-4">
           <Text className="text-gray-400 text-xs font-medium">INV: {item.id}</Text>
           <View className={`px-3 py-1 rounded-full ${statusInfo.bg}`}>
             <Text className={`text-[10px] font-bold ${statusInfo.text}`}>{statusInfo.label}</Text>
@@ -84,25 +84,27 @@ export default function HomeScreen() {
   };
 
   return (
-    <View className="flex-1 bg-[#FFF]">
+    <View className="flex-1 bg-[#F5F7FA]">
       <StatusBar barStyle="dark-content" />
       <View className="bg-white px-6 pt-12 pb-6">
-        <Text className="text-2xl font-bold mb-5">Pesanan</Text>
-        <View className="flex-row bg-[#F5F7FA] rounded-[10px] px-4 py-1 items-center mb-4">
+        <View className="bg-white mb-4">
+          <Text className="text-2xl font-bold text-gray-800">Kontrol Pesanan</Text>
+        </View>
+        <View className="flex-row bg-[#F5F7FA] rounded-[10px] px-4 py-3 items-center mb-6 ">
           <Search size={20} color="#633594" />
           <TextInput className="ml-3 flex-1 text-sm text-gray-700" placeholder="Cari transaksi..." value={search} onChangeText={setSearch} />
         </View>
         <View className="flex-row gap-2">
           {["all", "unpaid", "completed"].map((f) => (
-            <Pressable key={f} onPress={() => setFilter(f)} className={`px-4 py-2 rounded-xl border ${filter === f ? "border-[#633594] bg-[#633594]/5" : "border-gray-200"}`}>
-              <Text className={`text-[11px] font-bold ${filter === f ? "text-[#633594]" : "text-gray-500"}`}>{f === "all" ? "Semua" : f === "unpaid" ? "Menunggu" : "Selesai"}</Text>
+            <Pressable key={f} onPress={() => setFilter(f)} className={`px-3 py-1.5 rounded-[10px] ${filter === f ? "bg-[#633594]/10" : "bg-transparent"}`}>
+              <Text className={`text-[11px] font-bold ${filter === f ? "text-[#633594]" : "text-gray-400"}`}>{f === "all" ? "Semua" : f === "unpaid" ? "Menunggu" : "Selesai"}</Text>
             </Pressable>
           ))}
         </View>
       </View>
       <FlatList
         data={filteredOrders}
-        contentContainerStyle={{ paddingVertical: 10 }}
+        contentContainerStyle={{ paddingVertical: 5 }}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
         ListEmptyComponent={

@@ -62,7 +62,7 @@ export default function DetailOrderScreen() {
       <Stack.Screen options={{ title: `Order #${id}`, headerTintColor: "#633594", headerShadowVisible: false }} />
 
       <View className="p-4 space-y-4">
-        <View className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+        <View className="bg-white p-5 rounded-[10px]">
           <View className="flex-row items-center justify-between mb-4">
             <Text className="text-gray-400 text-xs font-bold uppercase tracking-wider">Status Pesanan</Text>
             <View className={`px-4 py-1.5 rounded-full ${statusInfo.bg}`}>
@@ -77,7 +77,7 @@ export default function DetailOrderScreen() {
           </View>
         </View>
 
-        <View className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+        <View className="bg-white p-5 rounded-[10px]">
           <Text className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Detail Pelanggan & Mitra</Text>
           <View className="space-y-4">
             <View className="flex-row items-center">
@@ -97,7 +97,7 @@ export default function DetailOrderScreen() {
           </View>
         </View>
 
-        <View className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+        <View className="bg-white p-5 rounded-[10px]">
           <View className="flex-row items-center mb-4">
             <MapPin size={18} color="#633594" />
             <Text className="ml-2 text-gray-400 text-xs font-bold uppercase tracking-wider">Lokasi & Catatan</Text>
@@ -111,7 +111,7 @@ export default function DetailOrderScreen() {
           )}
         </View>
 
-        <View className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
+        <View className="bg-white p-5 rounded-[10px]">
           <View className="flex-row items-center mb-4">
             <FileText size={18} color="#633594" />
             <Text className="ml-2 text-gray-400 text-xs font-bold uppercase tracking-wider">Rincian Layanan</Text>
@@ -131,7 +131,7 @@ export default function DetailOrderScreen() {
         </View>
 
         {order.proof_image_url && (
-          <View className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <View className="bg-white p-5 rounded-[10px] overflow-hidden">
             <Text className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Bukti Pengerjaan</Text>
             <Image source={{ uri: order.proof_image_url }} className="w-full h-60 rounded-2xl" />
           </View>

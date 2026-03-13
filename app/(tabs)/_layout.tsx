@@ -9,7 +9,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: "#95a5a6",
         headerShown: false,
         tabBarStyle: { paddingBottom: 5, height: 60 },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600", marginTop: 4 },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600", marginTop: 2 },
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Dashboard", tabBarIcon: ({ color }) => <LayoutDashboard size={24} color={color} /> }} />
