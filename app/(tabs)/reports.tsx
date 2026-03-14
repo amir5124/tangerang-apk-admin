@@ -60,8 +60,8 @@ export default function ReportsScreen() {
   return (
     <ScrollView className="flex-1 bg-[#F5F7FA]">
       <View className="bg-white px-4 pt-12 pb-6 mb-4">
-        <Text className="text-2xl font-bold text-gray-800">Kontrol Aplikasi</Text>
-        <Text className="text-gray-400 text-sm">Kelola aset dan promosi</Text>
+        <Text className="text-2xl font-bold text-gray-800">Kontrol Laporan</Text>
+        <Text className="text-gray-400 text-sm">Kelola laporan transaksi</Text>
       </View>
       <View className="px-4">
         <View className="flex-row bg-white p-1 rounded-[10px] mb-6 border border-gray-100 mt-2">

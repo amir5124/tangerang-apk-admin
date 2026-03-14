@@ -1,8 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { LogOut, Percent, Phone, Search, Store, UserCheck } from "lucide-react-native";
+import { LogOut, Phone, Search, Store, UserCheck } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, RefreshControl, Text, TextInput, View } from "react-native";
+import { Alert, FlatList, Platform, Pressable, RefreshControl, Text, TextInput, View } from "react-native";
+import Toast from "react-native-toast-message";
 import api from "../../src/utils/api";
 
 const getInitials = (name: string) => {
@@ -33,18 +34,57 @@ export default function AdminUserList() {
     }
   };
 
+  const executeApprove = async (storeId: number) => {
+    try {
+      const response = await api.put(`/mitra/approve/${storeId}`);
+      if (response.data.success) {
+        Toast.show({
+          type: "success",
+          text1: "Berhasil",
+          text2: response.data.message || "Mitra telah disetujui",
+        });
+        fetchUsers();
+      }
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: "Gagal",
+        text2: error.response?.data?.message || "Terjadi kesalahan server",
+      });
+    }
+  };
+
+  const handleApproveMitra = (storeId: number, storeName: string) => {
+    if (!storeId) {
+      Toast.show({ type: "error", text1: "Error", text2: "ID Toko tidak ditemukan" });
+      return;
+    }
+
+    if (Platform.OS === "web") {
+      const confirmWeb = window.confirm(`Setujui ${storeName} sebagai mitra resmi?`);
+      if (confirmWeb) executeApprove(storeId);
+    } else {
+      Alert.alert("Konfirmasi", `Setujui ${storeName} sebagai mitra resmi?`, [
+        { text: "Batal", style: "cancel" },
+        { text: "Ya, Setujui", onPress: () => executeApprove(storeId) },
+      ]);
+    }
+  };
+
   const handleLogout = () => {
-    Alert.alert("Konfirmasi Logout", "Apakah Anda yakin ingin keluar?", [
-      { text: "Batal", style: "cancel" },
-      {
-        text: "Keluar",
-        style: "destructive",
-        onPress: async () => {
-          await AsyncStorage.removeItem("token"); // Sesuaikan dengan key token Anda
-          router.replace("/(auth)/login"); // Arahkan ke rute login Anda
-        },
-      },
-    ]);
+    const logoutAction = async () => {
+      await AsyncStorage.removeItem("token");
+      router.replace("/(auth)/login");
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm("Apakah Anda yakin ingin keluar?")) logoutAction();
+    } else {
+      Alert.alert("Konfirmasi Logout", "Apakah Anda yakin ingin keluar?", [
+        { text: "Batal", style: "cancel" },
+        { text: "Keluar", style: "destructive", onPress: logoutAction },
+      ]);
+    }
   };
 
   useFocusEffect(
@@ -70,10 +110,10 @@ export default function AdminUserList() {
         <View className="flex-1 ml-4">
           <Text className="text-gray-800 font-bold text-base">{item.full_name}</Text>
           <Text className="text-gray-400 text-xs">{item.email}</Text>
-          <View className="flex-row items-center mt-1">
+          <div className="flex flex-row items-center mt-1">
             <Phone size={12} color="#94a3b8" />
             <Text className="text-gray-500 text-xs ml-1">{item.phone_number || "-"}</Text>
-          </View>
+          </div>
         </View>
         <View className="px-3 py-1 rounded-full bg-slate-100">
           <Text className="text-[10px] font-bold text-slate-600">{item.role?.toUpperCase()}</Text>
@@ -82,20 +122,24 @@ export default function AdminUserList() {
 
       {item.role === "mitra" && (
         <View className="border-t border-gray-50 pt-4 mt-4 flex-row items-center justify-between">
-          <View className="flex-row items-center">
+          <View className="flex-row items-center flex-1 mr-2">
             <Store size={14} color="#64748b" />
             <View className="ml-2">
               <Text className="text-xs font-bold text-gray-700">{item.store_name || "-"}</Text>
               <Text className={`text-[10px] font-bold ${item.store_status === "approved" ? "text-green-600" : "text-orange-500"}`}>{item.store_status?.toUpperCase() || "PENDING"}</Text>
             </View>
           </View>
+
           <View className="flex-row gap-2">
-            <Pressable onPress={() => Alert.alert("Approve", "Setujui mitra ini?")} className="bg-green-50 p-2.5 rounded-xl">
-              <UserCheck size={18} color="#16a34a" />
-            </Pressable>
-            <Pressable onPress={() => Alert.prompt("Ubah Komisi", "Masukkan %:", (val) => console.log(val))} className="bg-orange-50 p-2.5 rounded-xl">
+            {item.store_status !== "approved" && (
+              <Pressable onPress={() => handleApproveMitra(item.store_id, item.store_name)} className="bg-green-50 p-2.5 rounded-xl active:bg-green-100">
+                <UserCheck size={18} color="#16a34a" />
+              </Pressable>
+            )}
+
+            {/* <Pressable onPress={() => Alert.prompt("Ubah Komisi", "Masukkan %:", (val) => console.log(val))} className="bg-orange-50 p-2.5 rounded-xl">
               <Percent size={18} color="#ea580c" />
-            </Pressable>
+            </Pressable> */}
           </View>
         </View>
       )}
@@ -105,7 +149,6 @@ export default function AdminUserList() {
   return (
     <View className="flex-1 bg-[#F5F7FA]">
       <View className="bg-white px-4 pt-12 pb-6 mb-4 ">
-        {/* Bagian Judul dan Logout dalam satu baris */}
         <View className="flex-row justify-between items-start mb-4">
           <View>
             <Text className="text-2xl font-bold text-gray-800">Kontrol Pengguna</Text>
@@ -117,7 +160,6 @@ export default function AdminUserList() {
           </Pressable>
         </View>
 
-        {/* Search Bar */}
         <View className="flex-row bg-[#F5F7FA] rounded-2xl px-4 py-3 items-center">
           <Search size={20} color="#94a3b8" />
           <TextInput className="flex-1 ml-3 text-sm text-gray-700" placeholder="Cari nama atau email..." value={search} onChangeText={setSearch} />

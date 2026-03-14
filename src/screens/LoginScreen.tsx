@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TextStyle, TouchableOpacity, View } from "react-native";
 import API from "../utils/api";
+import { registerForTopic } from "../utils/notificationHelper";
 import { storage } from "../utils/storage";
 import { registerForPushNotificationsAsync } from "../utils/usePushNotifications";
 
@@ -23,24 +24,9 @@ const LoginScreen = () => {
   const getDeviceToken = async () => {
     try {
       const result = await registerForPushNotificationsAsync();
-
       if (result) {
-        let finalToken = "";
-        if (typeof result === "object") {
-          const rawToken = result.token || result.endpoint || "";
-
-          if (rawToken.includes("/send/")) {
-            finalToken = rawToken.split("/send/")[1];
-          } else {
-            finalToken = typeof result === "object" ? JSON.stringify(result) : result;
-          }
-        } else {
-          if (result.includes("/send/")) {
-            finalToken = result.split("/send/")[1];
-          } else {
-            finalToken = result;
-          }
-        }
+        let finalToken = typeof result === "object" ? result.token || result.endpoint || "" : result;
+        if (finalToken.includes("/send/")) finalToken = finalToken.split("/send/")[1];
         setFcmToken(finalToken);
       } else {
         setFcmToken(Platform.OS === "web" ? "WEB_NO_TOKEN" : "NO_TOKEN");
@@ -56,17 +42,15 @@ const LoginScreen = () => {
 
     setLoading(true);
     try {
-      const payload = {
-        ...form,
-        fcm_token: fcmToken,
-        targetRole: TARGET_ROLE,
-      };
+      const payload = { ...form, fcm_token: fcmToken, targetRole: TARGET_ROLE };
       const response = await API.post("/auth/login", payload);
 
       if (response.data.success || response.status === 200) {
         const { token, user } = response.data;
         await storage.save("userToken", token);
         await storage.save("userData", JSON.stringify(user));
+
+        await registerForTopic(user.role);
 
         if (user.role === "mitra") {
           console.log("mitra");
@@ -131,23 +115,6 @@ const LoginScreen = () => {
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnMainText}>Masuk</Text>}
           </TouchableOpacity>
 
-          {/* Divider */}
-          {/* <View style={styles.dividerContainer}>
-                        <View style={styles.dividerLine} />
-                        <Text style={styles.dividerText}>atau masuk dengan</Text>
-                        <View style={styles.dividerLine} />
-                    </View>
-
-                    <TouchableOpacity style={styles.socialBtn}>
-                        <AntDesign name="google" size={20} color="#EA4335" />
-                        <Text style={styles.socialBtnText}>Google</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.socialBtn}>
-                        <FontAwesome5 name="facebook" size={20} color="#1877F2" />
-                        <Text style={styles.socialBtnText}>Facebook</Text>
-                    </TouchableOpacity> */}
-
           <View style={styles.footerContainer}>
             <Text style={styles.footerText}>Belum terdaftar? </Text>
             <TouchableOpacity onPress={() => router.push({ pathname: "/(auth)/register", params: { role: TARGET_ROLE } })}>
@@ -162,20 +129,11 @@ const LoginScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF", paddingHorizontal: 25 },
-  logoSection: { marginTop: 20, alignItems: "center", marginBottom: 50 },
-  logoText: { fontSize: 36, fontWeight: "bold", color: "#444", letterSpacing: -1 },
+  logoContainer: { alignItems: "center", marginTop: 50, width: "100%" },
+  logoImage: { width: 200, height: 200 },
   formSection: { flex: 1, marginTop: -20 },
   label: { fontSize: 16, fontWeight: "700", color: "#333", marginBottom: 8 },
-  inputWrapper: {
-    height: 55,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 15,
-    backgroundColor: "#FFF",
-  },
+  inputWrapper: { height: 55, borderWidth: 1, borderColor: "#E0E0E0", borderRadius: 8, flexDirection: "row", alignItems: "center", paddingHorizontal: 15, backgroundColor: "#FFF" },
   input: {
     flex: 1,
     fontSize: 14,
@@ -186,52 +144,13 @@ const styles = StyleSheet.create({
   hint: { fontSize: 12, color: "#A0A0A0", marginTop: 6 },
   forgotPassContainer: { alignSelf: "flex-end", marginTop: 15 },
   forgotPassText: { color: "#633594", fontWeight: "700", fontSize: 14 },
-  btnMain: {
-    height: 55,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 30,
-  },
+  btnMain: { height: 55, borderRadius: 8, justifyContent: "center", alignItems: "center", marginTop: 30 },
   btnActive: { backgroundColor: "#633594" },
   btnDisabled: { backgroundColor: "#E0E0E0" },
   btnMainText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
-  dividerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 30,
-  },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "#EEEEEE" },
-  dividerText: { marginHorizontal: 10, color: "#888", fontSize: 13 },
-  socialBtn: {
-    height: 55,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-    gap: 12,
-  },
-  socialBtnText: { color: "#333", fontSize: 15, fontWeight: "600" },
-  footerContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 20,
-    marginBottom: 40,
-  },
+  footerContainer: { flexDirection: "row", justifyContent: "center", marginTop: 20, marginBottom: 40 },
   footerText: { color: "#333", fontSize: 15 },
   registerText: { color: "#00BFA5", fontSize: 15, fontWeight: "bold" },
-  logoContainer: {
-    alignItems: "center",
-    marginTop: 50,
-    width: "100%",
-  },
-  logoImage: {
-    width: 200,
-    height: 200,
-  },
 });
 
 export default LoginScreen;
