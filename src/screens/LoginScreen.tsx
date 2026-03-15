@@ -1,11 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Google from "expo-auth-session/providers/google";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TextStyle, TouchableOpacity, View } from "react-native";
 import API from "../utils/api";
 import { registerForTopic } from "../utils/notificationHelper";
 import { storage } from "../utils/storage";
 import { registerForPushNotificationsAsync } from "../utils/usePushNotifications";
+
+// Pastikan WebBrowser lengkap untuk handle redirect di web/mobile
+WebBrowser.maybeCompleteAuthSession();
 
 const LoginScreen = () => {
   const router = useRouter();
@@ -17,9 +22,24 @@ const LoginScreen = () => {
   const TARGET_ROLE = "admin";
   const isFormValid = form.email.length > 0 && form.password.length > 0;
 
+  // --- KONFIGURASI GOOGLE AUTH ---
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    webClientId: "206607018424-u9a7v54du628kt7mmnlcclsvq3og33ce.apps.googleusercontent.com",
+    // iosClientId: 'ISI_JIKA_ADA',
+    // androidClientId: 'ISI_JIKA_ADA',
+  });
+
   useEffect(() => {
     getDeviceToken();
   }, []);
+
+  // Handle Response Google
+  useEffect(() => {
+    if (response?.type === "success") {
+      const { id_token } = response.params;
+      handleGoogleLogin(id_token);
+    }
+  }, [response]);
 
   const getDeviceToken = async () => {
     try {
@@ -34,6 +54,34 @@ const LoginScreen = () => {
     } catch (error) {
       console.error("❌ Error Filter Token Login:", error);
       setFcmToken("ERROR_TOKEN");
+    }
+  };
+
+  // --- FUNGSI LOGIN GOOGLE ---
+  const handleGoogleLogin = async (idToken: string) => {
+    setLoading(true);
+    try {
+      const payload = {
+        idToken,
+        fcm_token: fcmToken,
+        targetRole: TARGET_ROLE, // Memastikan user login ke role yang benar
+      };
+
+      const res = await API.post("/auth/google", payload);
+
+      if (res.data.success) {
+        const { token, user } = res.data;
+        await storage.save("userToken", token);
+        await storage.save("userData", JSON.stringify(user));
+        await registerForTopic(user.role);
+
+        router.replace("/(tabs)");
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || "Login Google Gagal";
+      Platform.OS === "web" ? alert(errorMsg) : Alert.alert("Akses Ditolak", errorMsg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -115,6 +163,12 @@ const LoginScreen = () => {
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnMainText}>Masuk</Text>}
           </TouchableOpacity>
 
+          {/* --- TOMBOL GOOGLE --- */}
+          <TouchableOpacity style={styles.googleBtn} onPress={() => promptAsync()} disabled={!request || loading}>
+            <Ionicons name="logo-google" size={20} color="#333" style={{ marginRight: 10 }} />
+            <Text style={styles.googleBtnText}>Masuk dengan Google</Text>
+          </TouchableOpacity>
+
           <View style={styles.footerContainer}>
             <Text style={styles.footerText}>Belum terdaftar? </Text>
             <TouchableOpacity onPress={() => router.push({ pathname: "/(auth)/register", params: { role: TARGET_ROLE } })}>
@@ -148,6 +202,18 @@ const styles = StyleSheet.create({
   btnActive: { backgroundColor: "#633594" },
   btnDisabled: { backgroundColor: "#E0E0E0" },
   btnMainText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
+  googleBtn: {
+    height: 55,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 15,
+    backgroundColor: "#FFF",
+  },
+  googleBtnText: { color: "#333", fontSize: 16, fontWeight: "700" },
   footerContainer: { flexDirection: "row", justifyContent: "center", marginTop: 20, marginBottom: 40 },
   footerText: { color: "#333", fontSize: 15 },
   registerText: { color: "#00BFA5", fontSize: 15, fontWeight: "bold" },
