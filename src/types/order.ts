@@ -18,7 +18,8 @@ export interface Order {
   lng_customer: number | null;
   total_price: string;
   platform_fee: string;
-
+discount_amount: number;
+notes: string;
   service_fee: string;
   status: "unpaid" | "accepted" | "on_the_way" | "working" | "completed" | "cancelled";
   proof_image_url: string | null;

@@ -4,7 +4,7 @@ import * as Sharing from "expo-sharing";
 import {
   ArrowRightLeft,
   Download,
-  Filter, Info,
+  Info,
   Landmark,
   Layers,
   Search, ShoppingBag, TrendingUp, Wallet
@@ -101,29 +101,49 @@ export default function DashboardScreen() {
   }, [filteredData]);
 
   // --- FUNGSI EXPORT EXCEL (EKSEKUSI) ---
- const executeExport = async () => {
-  setShowExportModal(false);
-  const exportData = filteredData
-    .filter((o) => o.payment_status === "settlement" || o.status === "completed")
-    .map((o) => {
-      // Hitung Laba Bersih sesuai logika stats Anda (30% dari total + platform fee)
-      const omset = parseFloat(o.total_price || "0");
-      const pFee = parseFloat(o.platform_fee || "0");
-      const sFee = parseFloat(o.service_fee || "0");
-      const labaBersih = (omset * 0.3) + pFee;
+  const executeExport = async () => {
+    setShowExportModal(false);
 
-      return {
-        ID: o.id,
-        Tanggal: o.order_date,
-        Customer: o.customer_name,
-        Mitra: o.mitra_name,
-        "Total Harga": omset, 
-        "Laba Bersih": labaBersih, 
-        "Platform Fee": pFee, 
-        "Service Fee": sFee, 
-        Status: o.payment_status, 
-      };
-    });
+    // Pemetaan Status sesuai instruksi Anda
+    const getStatusLabel = (status: string) => {
+      switch (status) {
+        case "unpaid": return "MENUNGGU PEMBAYARAN";
+        case "accepted": return "DITERIMA";
+        case "on_the_way": return "DI PERJALANAN";
+        case "working": return "SEDANG DIKERJAKAN";
+        case "completed": return "SELESAI";
+        case "cancelled": return "DIBATALKAN";
+        default: return status ? status.toUpperCase() : "-";
+      }
+    };
+
+    const exportData = filteredData
+      .filter((o) => o.payment_status === "settlement" || o.status === "completed")
+      .map((o) => {
+        const omset = parseFloat(o.total_price || "0");
+        const pFee = parseFloat(o.platform_fee || "0");
+        const sFee = parseFloat(o.service_fee || "0");
+
+        // Logika pembagian sesuai gambar & stats
+        const feeVendor = omset * 0.7;
+        const feePlatform = omset * 0.3;
+        const labaBersih = feePlatform + pFee;
+
+        return {
+          "Tanggal": o.order_date,
+          "Customer": o.customer_name,
+          "Vendor/Mitra": o.mitra_name,
+          "ID Order": o.id,
+          "Total Harga": omset,
+          "Fee 70% Vendor": feeVendor,
+          "Fee 30% Platform": feePlatform,
+          "Platform Fee": pFee,
+          "Service Fee": sFee,
+          "Status": getStatusLabel(o.status),
+          "Keterangan": o.customer_notes || "-", // Diambil dari notes jika ada
+          "Laba Bersih": labaBersih,
+        };
+      });
 
     if (exportData.length === 0) {
       return Alert.alert("Info", "Tidak ada transaksi sukses untuk diekspor.");
@@ -132,8 +152,26 @@ export default function DashboardScreen() {
     setIsExporting(true);
     try {
       const ws = XLSX.utils.json_to_sheet(exportData);
+
+      // Mengatur lebar kolom agar rapi
+      const wscols = [
+        { wch: 20 }, // Tanggal
+        { wch: 20 }, // Customer
+        { wch: 20 }, // Mitra
+        { wch: 10 }, // ID
+        { wch: 15 }, // Total
+        { wch: 15 }, // Fee 70
+        { wch: 15 }, // Fee 30
+        { wch: 15 }, // Pfee
+        { wch: 15 }, // Sfee
+        { wch: 15 }, // Status
+        { wch: 25 }, // Keterangan
+        { wch: 15 }, // Laba
+      ];
+      ws['!cols'] = wscols;
+
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Transaksi Sukses");
+      XLSX.utils.book_append_sheet(wb, ws, "Laporan Transaksi");
 
       const filename = `Laporan_TangerangFast_${Date.now()}.xlsx`;
 
@@ -215,7 +253,6 @@ export default function DashboardScreen() {
             <Text className="text-white text-2xl font-black">Dashboard</Text>
           </View>
           <View className="flex-row">
-            {/* TOMBOL EXPORT EXCEL */}
             <TouchableOpacity
               className="bg-white/20 p-3 rounded-2xl mr-2"
               onPress={() => setShowExportModal(true)}
@@ -228,7 +265,6 @@ export default function DashboardScreen() {
               )}
             </TouchableOpacity>
 
-            {/* GANTI ICON KE TARIK/LANDMARK */}
             <TouchableOpacity
               className="bg-white/20 p-3 rounded-2xl"
               onPress={() => router.push("/withdraw" as any)}
@@ -238,7 +274,6 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* SEARCH BAR */}
         <View className="flex-row bg-white/15 border border-white/10 rounded-[20px] px-4 py-3 items-center">
           <Search size={18} color="rgba(255,255,255,0.6)" />
           <TextInput
@@ -340,7 +375,6 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-       
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
           <TouchableOpacity
             onPress={() => setSelectedMitra(null)}
@@ -363,7 +397,7 @@ export default function DashboardScreen() {
           ))}
         </ScrollView>
 
-         {/* STATUS FILTER */}
+        {/* STATUS FILTER */}
         <View className="flex-row justify-between items-center mt-2 mb-4 px-1">
           <Text className="text-gray-900 font-black text-base">Filter Status</Text>
         </View>
@@ -392,7 +426,7 @@ export default function DashboardScreen() {
         {/* RECENT ACTIVITY LIST */}
         <View className="flex-row justify-between items-center mb-4 px-1">
           <Text className="text-lg font-black text-gray-900">Recent Activity</Text>
-          <Filter size={18} color="#633594" />
+
         </View>
 
         <View className="mb-10">
@@ -401,7 +435,12 @@ export default function DashboardScreen() {
               <View key={item.id} className="bg-white p-4 rounded-[28px] mb-3 flex-row items-center border border-gray-50">
                 <View className={`w-12 h-12 rounded-full items-center justify-center ${item.status === "completed" ? "bg-green-50" : "bg-purple-50"}`}>
                   <Text className={`font-black text-xs ${item.status === "completed" ? "text-green-600" : "text-purple-600"}`}>
-                    {item.customer_name.substring(0, 2).toUpperCase()}
+                    {item.customer_name
+                      .split(" ")
+                      .map((word) => word[0])
+                      .join("")
+                      .substring(0, 2)
+                      .toUpperCase()}
                   </Text>
                 </View>
 
@@ -416,9 +455,25 @@ export default function DashboardScreen() {
                   <Text className="font-black text-gray-900 text-sm">
                     {formatRupiah(parseFloat(item.total_price))}
                   </Text>
-                  <View className={`px-2 py-0.5 rounded-md mt-1 ${item.payment_status === "settlement" ? "bg-green-100" : "bg-orange-100"}`}>
-                    <Text className={`text-[8px] font-bold uppercase ${item.payment_status === "settlement" ? "text-green-700" : "text-orange-700"}`}>
-                      {item.payment_status || "Pending"}
+                  <View className={`px-2 py-0.5 rounded-md mt-1 ${item.status === "accepted" ? "bg-blue-100" :
+                      item.status === "on_the_way" ? "bg-purple-100" :
+                        item.status === "working" ? "bg-orange-100" :
+                          item.status === "completed" ? "bg-green-100" :
+                            item.status === "cancelled" ? "bg-red-100" : "bg-gray-100"
+                    }`}>
+                    <Text className={`text-[8px] font-bold uppercase ${item.status === "accepted" ? "text-blue-700" :
+                        item.status === "on_the_way" ? "text-purple-700" :
+                          item.status === "working" ? "text-orange-700" :
+                            item.status === "completed" ? "text-green-700" :
+                              item.status === "cancelled" ? "text-red-700" : "text-gray-700"
+                      }`}>
+                      {
+                        item.status === "accepted" ? "DITERIMA" :
+                          item.status === "on_the_way" ? "DI PERJALANAN" :
+                            item.status === "working" ? "DIPROSES" :
+                              item.status === "completed" ? "SELESAI" :
+                                item.status === "cancelled" ? "BATAL" : (item.status || "-").toUpperCase()
+                      }
                     </Text>
                   </View>
                 </View>

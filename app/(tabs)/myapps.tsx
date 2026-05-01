@@ -40,28 +40,27 @@ export default function MyAppsScreen() {
   const [addServiceModal, setAddServiceModal] = useState(false);
   const [editNameModal, setEditNameModal] = useState(false);
 
-
   // States: Form Data
   const [newService, setNewService] = useState({ key: "", name: "" });
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [newNameValue, setNewNameValue] = useState("");
   
- const [vouchers, setVouchers] = useState<any[]>([]);
+  const [vouchers, setVouchers] = useState<any[]>([]);
   const [selectedVoucher, setSelectedVoucher] = useState<any>(null);
   const [serviceFee, setServiceFee] = useState("");
   const [adminFee, setAdminFee] = useState("");
   const [isSavingFee, setIsSavingFee] = useState(false);
-  // State untuk mengontrol Modal
-const [modalVisible, setModalVisible] = useState(false);
-
-
-
-// State Form (Sesuai nama variabel di modal kamu)
-const [formCode, setFormCode] = useState("");
-const [formPercent, setFormPercent] = useState("");
-const [formMin, setFormMin] = useState("");
-const [formMax, setFormMax] = useState("");
-const [formUsageLimit, setFormUsageLimit] = useState("");
+  
+  // State Voucher
+  const [modalVisible, setModalVisible] = useState(false);
+  const [formCode, setFormCode] = useState("");
+  const [formPercent, setFormPercent] = useState("");
+  const [formMin, setFormMin] = useState("");
+  const [formMax, setFormMax] = useState("");
+  const [formUsageLimit, setFormUsageLimit] = useState("");
+  const [formDescription, setFormDescription] = useState("");
+  const [formImageUrl, setFormImageUrl] = useState("");
+  const [isUploadingVoucher, setIsUploadingVoucher] = useState(false);
 
   // States: Broadcast
   const [target, setTarget] = useState<"user" | "mitra">("user");
@@ -128,6 +127,31 @@ const [formUsageLimit, setFormUsageLimit] = useState("");
     }
   };
 
+  const pickVoucherImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.6,
+    });
+
+    if (!result.canceled) {
+      setIsUploadingVoucher(true);
+      try {
+        const base64 = await getBase64(result.assets[0].uri);
+        const res = await api.post("/assets/upload-base64", {
+          key_name: `vch_${Date.now()}`,
+          image_data: base64,
+          file_name: `voucher_${formCode || 'new'}.jpg`,
+        });
+        setFormImageUrl(res.data.url); 
+        Toast.show({ type: 'success', text1: 'Gambar Voucher Terpilih' });
+      } catch (error) {
+        Toast.show({ type: 'error', text1: 'Gagal upload gambar voucher' });
+      } finally {
+        setIsUploadingVoucher(false);
+      }
+    }
+  };
+
   const handleCreateService = async () => {
     if (!newService.key || !newService.name) return;
     setLoading(true);
@@ -188,26 +212,47 @@ const [formUsageLimit, setFormUsageLimit] = useState("");
     }
   };
 
-  const handleUpdateVoucher = async () => {
-  if (!selectedVoucher?.id) return;
-  setLoading(true);
-  try {
-    await api.put(`/voucher/${selectedVoucher.id}`, {
+  const handleSaveVoucher = async () => {
+    setLoading(true);
+    const payload = {
       code: formCode,
       discount_percent: formPercent,
-      min_spend: formMin, // Field Min Belanja
+      min_purchase: formMin,
       max_discount_amount: formMax,
-      usage_limit: formUsageLimit, // Field Kuota/User
-    });
-    Toast.show({ type: 'success', text1: 'Berhasil', text2: 'Voucher diperbarui' });
-    setModalVisible(false);
-    fetchVouchers(); // Refresh list
-  } catch (e) {
-    Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal update voucher' });
-  } finally {
-    setLoading(false);
-  }
-};
+      usage_limit: formUsageLimit,
+      description: formDescription,
+      image_url: formImageUrl
+    };
+
+    try {
+      if (selectedVoucher?.id) {
+        await api.put(`/voucher/${selectedVoucher.id}`, payload);
+        Toast.show({ type: 'success', text1: 'Voucher diperbarui' });
+      } else {
+        await api.post("/voucher/bulk", { vouchers: [payload] });
+        Toast.show({ type: 'success', text1: 'Voucher baru ditambahkan' });
+      }
+      setModalVisible(false);
+      fetchVouchers();
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Gagal menyimpan voucher' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteVoucher = async (id: number) => {
+    setLoading(true);
+    try {
+      await api.delete("/voucher/bulk", { data: { ids: [id] } });
+      Toast.show({ type: 'success', text1: 'Voucher dihapus' });
+      fetchVouchers();
+    } catch (e) {
+      Toast.show({ type: 'error', text1: 'Gagal menghapus voucher' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleToggleVoucher = async (id: number, currentStatus: number) => {
     try {
@@ -217,8 +262,6 @@ const [formUsageLimit, setFormUsageLimit] = useState("");
       Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal mengubah status' });
     }
   };
-
-  // --- RENDER COMPONENTS ---
 
   return (
     <View className="flex-1 bg-[#F5F7FA]">
@@ -284,15 +327,21 @@ const [formUsageLimit, setFormUsageLimit] = useState("");
 
         {/* 3. MENU LAYANAN */}
         <View className="px-4 mt-8">
-          <View className="flex-row justify-between items-center mb-3">
-            <View className="flex-row items-center">
-              <LayoutGrid size={18} color="#633594" />
-              <Text className="text-lg font-bold ml-2">Menu Layanan</Text>
-            </View>
-            <Pressable onPress={() => setAddServiceModal(true)} className="bg-[#633594] px-4 py-1.5 rounded-full">
-              <Text className="text-white text-[10px] font-bold">+ LAYANAN</Text>
-            </Pressable>
-          </View>
+         <View className="flex-row justify-between items-center mb-3 px-1">
+  {/* SISI KIRI: Icon & Judul */}
+  <View className="flex-row items-center">
+    <LayoutGrid size={18} color="#633594" />
+    <Text className="text-lg font-bold ml-2 text-gray-800">Menu Layanan</Text>
+  </View>
+
+  {/* SISI KANAN: Tombol Tambah */}
+  <Pressable 
+    onPress={() => setAddServiceModal(true)} 
+    className="bg-[#633594] px-4 py-1.5 rounded-full active:opacity-70"
+  >
+    <Text className="text-white text-[10px] font-bold">+ LAYANAN</Text>
+  </Pressable>
+</View>
           <View className="bg-white rounded-2xl p-4 flex-row flex-wrap justify-between  border border-gray-100">
             {assets?.filter(a => a.key_name.startsWith('icon_')).map((asset) => (
               <View key={asset.id} className="w-[23%] items-center mb-5">
@@ -340,55 +389,69 @@ const [formUsageLimit, setFormUsageLimit] = useState("");
           </View>
         </View>
 
-     {/* 4. VOUCHER */}
-<View className="px-4 mt-8">
-  <View className="flex-row items-center mb-3">
-    <Ticket size={18} color="#633594" />
-    <Text className="text-lg font-bold ml-2">Manajemen Voucher</Text>
-  </View>
-  <View className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-    {vouchers.map((v) => (
-      <View key={v.id} className="p-4 border-b border-gray-50 flex-row items-center">
-        <View className="flex-1">
-          <View className="flex-row items-center">
-            <Text className="font-black text-[#633594] text-base">{v.code}</Text>
-            
-            {/* TOMBOL PENSIL EDIT */}
+        {/* 5. VOUCHER */}
+        <View className="px-4 mt-8">
+          <View className="flex-row justify-between items-center mb-3">
+            <View className="flex-row items-center">
+              <Ticket size={18} color="#633594" />
+              <Text className="text-lg font-bold ml-2">Manajemen Voucher</Text>
+            </View>
             <Pressable 
               onPress={() => {
-                setSelectedVoucher(v);
-                // Isi semua state form dengan data voucher yang dipilih
-                setFormCode(v.code);
-                setFormPercent(String(v.discount_percent));
-                setFormMin(String(v.min_spend || "0"));
-                setFormMax(String(v.max_discount_amount));
-                setFormUsageLimit(String(v.usage_limit || "0"));
+                setSelectedVoucher(null);
+                setFormCode("");
+                setFormPercent("");
+                setFormMin("");
+                setFormMax("");
+                setFormUsageLimit("");
+                setFormDescription("");
+                setFormImageUrl("");
                 setModalVisible(true);
               }} 
-              className="ml-2 p-1.5 bg-purple-50 rounded-full"
+              className="bg-[#633594] px-4 py-1.5 rounded-full"
             >
-              <Pencil size={12} color="#633594" />
+              <Text className="text-white text-[10px] font-bold">+ VOUCHER</Text>
             </Pressable>
           </View>
-          
-          {/* INFO RINGKAS */}
-          <Text className="text-[11px] text-gray-500 mt-0.5">
-            Disc {v.discount_percent}% • Min. Rp{parseInt(v.min_spend || 0).toLocaleString('id-ID')}
-          </Text>
-          <Text className="text-[11px] text-gray-400">
-            Maks. Potongan Rp{parseInt(v.max_discount_amount).toLocaleString('id-ID')}
-          </Text>
+          <View className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            {vouchers.map((v) => (
+              <View key={v.id} className="p-4 border-b border-gray-50 flex-row items-center">
+                <View className="flex-1">
+                  <View className="flex-row items-center">
+                    <Text className="font-black text-[#633594] text-base">{v.code}</Text>
+                    <Pressable 
+                      onPress={() => {
+                        setSelectedVoucher(v);
+                        setFormCode(v.code);
+                        setFormPercent(String(v.discount_percent));
+                        setFormMin(String(v.min_purchase || "0"));
+                        setFormMax(String(v.max_discount_amount));
+                        setFormUsageLimit(String(v.usage_limit || "0"));
+                        setFormDescription(v.description || "");
+                        setFormImageUrl(v.image_url || "");
+                        setModalVisible(true);
+                      }} 
+                      className="ml-2 p-1.5 bg-purple-50 rounded-full"
+                    >
+                      <Pencil size={12} color="#633594" />
+                    </Pressable>
+                    <Pressable onPress={() => handleDeleteVoucher(v.id)} className="ml-2 p-1.5 bg-red-50 rounded-full">
+                      <Trash2 size={12} color="#ef4444" />
+                    </Pressable>
+                  </View>
+                  <Text className="text-[11px] text-gray-500 mt-0.5">
+                    Disc {v.discount_percent}% • Min. Rp{parseInt(v.min_purchase || 0).toLocaleString('id-ID')}
+                  </Text>
+                </View>
+                <Switch 
+                  value={v.is_active === 1} 
+                  onValueChange={() => handleToggleVoucher(v.id, v.is_active)}
+                  trackColor={{ true: '#633594', false: '#cbd5e1' }} 
+                />
+              </View>
+            ))}
+          </View>
         </View>
-
-        <Switch 
-          value={v.is_active === 1} 
-          onValueChange={() => handleToggleVoucher(v.id, v.is_active)}
-          trackColor={{ true: '#633594', false: '#cbd5e1' }} 
-        />
-      </View>
-    ))}
-  </View>
-</View>
 
         {/* 6. BIAYA-BIAYA */}
         <View className="px-4 mt-8">
@@ -437,7 +500,65 @@ const [formUsageLimit, setFormUsageLimit] = useState("");
 
       {/* --- MODALS --- */}
       
-      {/* 1. Modal Hapus Service */}
+      {/* Modal Voucher (Create & Edit) */}
+      <Modal animationType="slide" transparent={true} visible={modalVisible}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-[30px] p-6 pb-10 max-h-[90%]">
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View className="flex-row justify-between items-center mb-6">
+                <Text className="text-xl font-bold text-gray-800">{selectedVoucher ? "Edit" : "Tambah"} Voucher</Text>
+                <Pressable onPress={() => setModalVisible(false)} className="p-2 bg-gray-100 rounded-full">
+                  <X size={20} color="#633594" />
+                </Pressable>
+              </View>
+
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Gambar Promo (Opsional)</Text>
+              <Pressable 
+                onPress={pickVoucherImage}
+                className="h-32 bg-gray-50 rounded-xl mb-4 justify-center items-center overflow-hidden border border-dashed border-gray-200"
+              >
+                {isUploadingVoucher ? <ActivityIndicator color="#633594" /> : 
+                  formImageUrl ? <Image source={{ uri: `https://backend.tangerangfast.online${formImageUrl}` }} className="w-full h-full" /> : 
+                  <View className="items-center"><ImagePlus size={24} color="#cbd5e1" /><Text className="text-[10px] text-gray-400 mt-1">Upload Banner</Text></View>}
+              </Pressable>
+
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Kode Voucher</Text>
+              <TextInput className="bg-gray-50 p-4 rounded-xl mb-4 border border-gray-100 font-bold text-[#633594]" value={formCode} onChangeText={setFormCode} autoCapitalize="characters" />
+              
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Deskripsi Promo</Text>
+              <TextInput multiline className="bg-gray-50 p-4 rounded-xl mb-4 border border-gray-100" placeholder="Jelaskan detail promo..." value={formDescription} onChangeText={setFormDescription} />
+
+              <View className="flex-row gap-4 mb-4">
+                <View className="flex-1">
+                  <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Diskon (%)</Text>
+                  <TextInput className="bg-gray-50 p-4 rounded-xl border border-gray-100" keyboardType="numeric" value={formPercent} onChangeText={setFormPercent} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Min. Belanja (Rp)</Text>
+                  <TextInput className="bg-gray-50 p-4 rounded-xl border border-gray-100" keyboardType="numeric" value={formMin} onChangeText={setFormMin} />
+                </View>
+              </View>
+
+              <View className="flex-row gap-4 mb-6">
+                <View className="flex-1">
+                  <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Maks Potongan (Rp)</Text>
+                  <TextInput className="bg-gray-50 p-4 rounded-xl border border-gray-100" keyboardType="numeric" value={formMax} onChangeText={setFormMax} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Limit / User</Text>
+                  <TextInput className="bg-gray-50 p-4 rounded-xl border border-gray-100" keyboardType="numeric" value={formUsageLimit} onChangeText={setFormUsageLimit} />
+                </View>
+              </View>
+
+              <Pressable className={`py-4 rounded-xl items-center ${loading ? "bg-gray-400" : "bg-[#633594]"}`} onPress={handleSaveVoucher} disabled={loading}>
+                <Text className="text-white font-bold text-lg">{loading ? "Menyimpan..." : "Simpan Voucher"}</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Hapus Service */}
       <Modal visible={modalDelete.visible} transparent animationType="fade">
         <View className="flex-1 justify-center items-center bg-black/60 px-8">
           <View className="bg-white w-full rounded-3xl p-6 items-center">
@@ -452,7 +573,7 @@ const [formUsageLimit, setFormUsageLimit] = useState("");
         </View>
       </Modal>
 
-      {/* 2. Modal Edit Nama */}
+      {/* Modal Edit Nama Service */}
       <Modal visible={editNameModal} transparent animationType="fade">
         <View className="flex-1 justify-center items-center bg-black/50 px-8">
           <View className="bg-white w-full rounded-3xl p-6">
@@ -473,7 +594,7 @@ const [formUsageLimit, setFormUsageLimit] = useState("");
         </View>
       </Modal>
 
-      {/* 3. Modal Tambah Layanan */}
+      {/* Modal Tambah Layanan */}
       <Modal visible={addServiceModal} transparent animationType="slide">
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-[30px] p-6 pb-10">
@@ -482,38 +603,6 @@ const [formUsageLimit, setFormUsageLimit] = useState("");
             <TextInput placeholder="Kode Unik (e.g. pijat)" autoCapitalize="none" className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6" value={newService.key} onChangeText={t => setNewService(p => ({...p, key: t}))} />
             <Pressable onPress={handleCreateService} className="bg-[#633594] py-4 rounded-xl items-center shadow-lg"><Text className="text-white font-bold">SIMPAN LAYANAN</Text></Pressable>
             <Pressable onPress={() => setAddServiceModal(false)} className="mt-4 items-center"><Text className="text-gray-400 font-bold">Batal</Text></Pressable>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-        <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white rounded-t-[20px] p-6 pb-10">
-            <View className="flex-row justify-between items-center mb-6">
-              <Text className="text-xl font-bold text-gray-800">Edit Voucher</Text>
-              <Pressable onPress={() => setModalVisible(false)} className="p-2 bg-gray-100 rounded-full">
-                <X size={20} color="#633594" />
-              </Pressable>
-            </View>
-            <Text className="text-gray-500 text-xs mb-1 ml-1 font-bold uppercase">KODE VOUCHER</Text>
-            <TextInput className="bg-gray-50 p-4 rounded-[15px] mb-4 border border-gray-100 font-bold text-[#633594]" value={formCode} onChangeText={setFormCode} autoCapitalize="characters" />
-            <View className="flex-row gap-4 mb-4">
-              <View className="flex-1">
-                <Text className="text-gray-500 text-xs mb-1 ml-1 font-bold uppercase">DISKON (%)</Text>
-                <TextInput className="bg-gray-50 p-4 rounded-[15px] border border-gray-100" keyboardType="numeric" value={formPercent} onChangeText={setFormPercent} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-gray-500 text-xs mb-1 ml-1 font-bold uppercase">MIN. BELANJA</Text>
-                <TextInput className="bg-gray-50 p-4 rounded-[15px] border border-gray-100" keyboardType="numeric" value={formMin} onChangeText={setFormMin} />
-              </View>
-            </View>
-            <Text className="text-gray-500 text-xs mb-1 ml-1 font-bold uppercase">MAKSIMAL POTONGAN (RP)</Text>
-            <TextInput className="bg-gray-50 p-4 rounded-[15px] mb-6 border border-gray-100" keyboardType="numeric" value={formMax} onChangeText={setFormMax} />
-            <Text className="text-gray-500 text-xs mb-1 ml-1 font-bold uppercase">KUOTA PEMAKAIAN/USER (KALI)</Text>
-            <TextInput className="bg-gray-50 p-4 rounded-[15px] mb-6 border border-gray-100 font-bold text-[#633594]" keyboardType="numeric" value={formUsageLimit} onChangeText={setFormUsageLimit} placeholder="0 untuk tidak terbatas" />
-            <Pressable className={`py-4 rounded-[15px] items-center ${loading ? "bg-gray-400" : "bg-[#633594]"}`} onPress={handleUpdateVoucher} disabled={loading}>
-              <Text className="text-white font-bold text-lg">{loading ? "Menyimpan..." : "Simpan Perubahan"}</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>

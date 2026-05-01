@@ -210,43 +210,57 @@ export default function DetailOrderScreen() {
             const buildingFee = order.building_type === "Rumah" ? 0 : 5000;
             const totalPrice = parseInt(order.total_price) + parseInt(order.platform_fee) + parseInt(order.service_fee);
 
-            return (
-              <View className="bg-white p-5 rounded-[10px]">
-                <View className="flex-row items-center mb-4">
-                  <FileText size={18} color="#633594" />
-                  <Text className="ml-2 text-gray-400 text-xs font-bold uppercase tracking-wider">Rincian Layanan</Text>
-                </View>
+            const discountAmount = order.discount_amount;
+const finalTotalPrice = totalPrice - discountAmount;
 
-                {services.map((item: OrderItem, index: number) => (
-                  <View key={index} className="flex-row justify-between mb-3">
-                    <Text className="text-gray-600 flex-1 mr-2">
-                      {item.nama} <Text className="text-gray-400 text-xs">x{item.qty}</Text>
-                    </Text>
-                    <Text className="font-medium text-gray-800">Rp {item.hargaSatuan.toLocaleString("id-ID")}</Text>
-                  </View>
-                ))}
+return (
+  <View className="bg-white p-5 rounded-[10px]">
+    <View className="flex-row items-center mb-4">
+      <FileText size={18} color="#633594" />
+      <Text className="ml-2 text-gray-400 text-xs font-bold uppercase tracking-wider">Rincian Layanan</Text>
+    </View>
 
-                <View className="flex-row justify-between mb-2">
-                  <Text className="text-gray-500">Biaya Gedung ({order.building_type})</Text>
-                  <Text className="text-gray-800 font-medium">Rp {buildingFee.toLocaleString("id-ID")}</Text>
-                </View>
+    {services.map((item: OrderItem, index: number) => (
+      <View key={index} className="flex-row justify-between mb-3">
+        <Text className="text-gray-600 flex-1 mr-2">
+          {item.nama} <Text className="text-gray-400 text-xs">x{item.qty}</Text>
+        </Text>
+        <Text className="font-medium text-gray-800">Rp {item.hargaSatuan.toLocaleString("id-ID")}</Text>
+      </View>
+    ))}
 
-                <View className="flex-row justify-between mb-2">
-                  <Text className="text-gray-500">Biaya Layanan</Text>
-                  <Text className="text-gray-800 font-medium">Rp {parseInt(order.platform_fee).toLocaleString("id-ID")}</Text>
-                </View>
+    <View className="flex-row justify-between mb-2">
+      <Text className="text-gray-500">Biaya Gedung ({order.building_type})</Text>
+      <Text className="text-gray-800 font-medium">Rp {buildingFee.toLocaleString("id-ID")}</Text>
+    </View>
 
-                <View className="flex-row justify-between mb-2">
-                  <Text className="text-gray-500">Biaya Admin (PG)</Text>
-                  <Text className="text-gray-800 font-medium">Rp {parseInt(order.service_fee).toLocaleString("id-ID")}</Text>
-                </View>
+    <View className="flex-row justify-between mb-2">
+      <Text className="text-gray-500">Biaya Layanan</Text>
+      <Text className="text-gray-800 font-medium">Rp {parseInt(order.platform_fee).toLocaleString("id-ID")}</Text>
+    </View>
 
-                <View className="mt-4 pt-4 border-t border-dashed border-gray-200 flex-row justify-between items-center">
-                  <Text className="font-bold text-gray-800 text-base">Total Pembayaran</Text>
-                  <Text className="font-bold text-xl text-[#633594]">Rp {totalPrice.toLocaleString("id-ID")}</Text>
-                </View>
-              </View>
-            );
+    {/* LOGIKA DISCOUNT: Tampil di bawah Biaya Layanan jika > 0 */}
+    {discountAmount > 0 && (
+      <View className="flex-row justify-between mb-2">
+        <Text className="text-red-500 font-medium">Diskon</Text>
+        <Text className="text-red-500 font-medium">- Rp {discountAmount.toLocaleString("id-ID")}</Text>
+      </View>
+    )}
+
+    <View className="flex-row justify-between mb-2">
+      <Text className="text-gray-500">Biaya Admin (PG)</Text>
+      <Text className="text-gray-800 font-medium">Rp {parseInt(order.service_fee).toLocaleString("id-ID")}</Text>
+    </View>
+
+    <View className="mt-4 pt-4 border-t border-dashed border-gray-200 flex-row justify-between items-center">
+      <Text className="font-bold text-gray-800 text-base">Total Pembayaran</Text>
+      <Text className="font-bold text-xl text-[#633594]">
+        {/* Gunakan variabel yang sudah dikurangi diskon */}
+        Rp {finalTotalPrice.toLocaleString("id-ID")}
+      </Text>
+    </View>
+  </View>
+);
           })()}
 
           {/* Card 5: Bukti Pengerjaan */}
