@@ -1,5 +1,4 @@
 import NetInfo from "@react-native-community/netinfo";
-import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter } from "expo-router";
@@ -11,8 +10,10 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import Toast, { BaseToast, ErrorToast, ToastConfig } from "react-native-toast-message";
 import "../global.css";
 
+// Import Firebase
 import { getApps, initializeApp } from "firebase/app";
 
+// 1. Konfigurasi Firebase Native
 const firebaseConfig = {
   apiKey: "AIzaSyDlcY6gl30RNhKvTFUMYLB9W-booJLYVHs",
   authDomain: "mitra-tangerangfast.firebaseapp.com",
@@ -22,20 +23,23 @@ const firebaseConfig = {
   appId: "1:206607018424:web:4f0ddad4a1a6fc3aa7074d",
 };
 
+// 2. Inisialisasi Firebase
 if (getApps().length === 0) {
   initializeApp(firebaseConfig);
 }
 
+// Handler Notifikasi saat aplikasi terbuka
 Notifications.setNotificationHandler({
-  handleNotification: async () =>
-    ({
-      shouldShowAlert: false,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      priority: Notifications.AndroidImportance.MAX,
-    }) as any,
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
 });
 
+// Konfigurasi Toast
 const toastConfig: ToastConfig = {
   success: (props) => <BaseToast {...props} style={styles.toastBase} contentContainerStyle={styles.toastContent} text1Style={styles.toastText1} text2Style={styles.toastText2} />,
   error: (props) => (
@@ -49,6 +53,46 @@ const toastConfig: ToastConfig = {
   ),
 };
 
+/** 
+ * FUNGSI REGISTER NOTIFIKASI
+ * Pastikan file suara ada di: android/app/src/main/res/raw/notification.mp3
+ */
+export async function registerForPushNotificationsAsync() {
+  let token;
+  if (!Device.isDevice) {
+    console.log("⚠️ Harus menggunakan perangkat fisik");
+    return undefined;
+  }
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+  if (existingStatus !== "granted") {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  if (finalStatus !== "granted") {
+    console.log("❌ Izin ditolak");
+    return undefined;
+  }
+  try {
+    if (Platform.OS === "android") {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await Notifications.setNotificationChannelAsync("orders", {
+        name: "Pesanan & Transaksi",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#633594",
+        showBadge: true,
+        sound: "notification",
+      });
+    }
+    const deviceToken = await Notifications.getDevicePushTokenAsync();
+    token = deviceToken.data;
+  } catch (error: any) {
+    console.error("🔥 FCM Token Error:", error.message);
+  }
+  return token;
+}
+
 const ConnectionBanner = () => {
   const [isConnected, setIsConnected] = useState<boolean | null>(true);
   useEffect(() => {
@@ -57,7 +101,6 @@ const ConnectionBanner = () => {
     });
     return () => unsubscribe();
   }, []);
-
   if (isConnected) return null;
   return (
     <View style={styles.offlineBanner}>
@@ -70,45 +113,65 @@ const ConnectionBanner = () => {
 function RootLayoutContent() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const notificationListener = useRef<any>(null);
-  const responseListener = useRef<any>(null);
 
-  useEffect(() => {
-    if (Platform.OS !== "web") {
-      registerForPushNotificationsAsync().then((token) => {
-        if (token) console.log("✅ Native Push Token:", token);
-      });
-
-      notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-        const { title, body, data } = notification.request.content;
-        Toast.show({
-          type: "success",
-          text1: title || "Informasi Baru",
-          text2: body || "Ada pembaruan data",
-          onPress: () => handleRedirect(data),
-        });
-      });
-
-      responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data;
-        handleRedirect(data);
-      });
-    }
-
-    return () => {
-      if (notificationListener.current) notificationListener.current.remove();
-      if (responseListener.current) responseListener.current.remove();
-    };
-  }, []);
+  // Tipe data eksplisit dengan nilai awal undefined
+  const notificationListener = useRef<Notifications.Subscription | undefined>(undefined);
+  const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
 
   const handleRedirect = (data: any) => {
-    if (data?.orderId) {
-      router.replace({
-        pathname: "/",
-        params: { orderId: data.orderId },
+  if (!data) return;
+
+  console.log("🔔 Redirecting with data:", data);
+
+  // Jika tujuan adalah Tab Profile
+  if (data.type === "NEW_USER" || data.screen === "/(tabs)/profile") {
+    // Gunakan replace untuk berpindah antar tab utama
+    router.replace("/(tabs)/profile");
+  } 
+  else if (data.orderId) {
+    router.push(`/order/${data.orderId}`);
+  } 
+  else if (data.screen) {
+    // Pastikan path screen diawali dengan /
+    const target = data.screen.startsWith('/') ? data.screen : `/${data.screen}`;
+    router.push(target);
+  }
+};
+
+  useEffect(() => {
+    registerForPushNotificationsAsync().then((token) => {
+      if (token) console.log("✅ Native FCM Token:", token);
+    });
+
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        const data = response.notification.request.content.data;
+        setTimeout(() => handleRedirect(data), 1000);
+      }
+    });
+
+    // Pasang listener
+    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
+      const { title, body, data } = notification.request.content;
+      Toast.show({
+        type: "success",
+        text1: title || "Informasi Baru",
+        text2: body || "Ada pembaruan data",
+        onPress: () => handleRedirect(data),
       });
-    }
-  };
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      handleRedirect(data);
+    });
+
+    // Cleanup aman tanpa garis merah
+    return () => {
+      notificationListener.current?.remove();
+      responseListener.current?.remove();
+    };
+  }, [])
 
   return (
     <View style={styles.container}>
@@ -122,11 +185,12 @@ function RootLayoutContent() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" options={{ animation: "fade_from_bottom" }} />
           <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
+          {/* Pastikan file ini ada: app/order/[id].tsx */}
+          <Stack.Screen name="order/[id]" options={{ animation: "slide_from_right" }} />
         </Stack>
       </View>
 
       <View style={{ height: insets.bottom, backgroundColor: "#fff" }} />
-
       <Toast config={toastConfig} position="top" topOffset={insets.top + 10} />
     </View>
   );
@@ -138,48 +202,6 @@ export default function RootLayout() {
       <RootLayoutContent />
     </SafeAreaProvider>
   );
-}
-
-async function registerForPushNotificationsAsync(): Promise<string | undefined> {
-  if (Platform.OS === "web") return undefined;
-
-  let token: string | undefined;
-
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== "granted") {
-      return undefined;
-    }
-
-    try {
-      if (Platform.OS === "android") {
-        await Notifications.setNotificationChannelAsync("default", {
-          name: "default",
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: "#633594",
-        });
-      }
-
-      const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-      if (!projectId) throw new Error("Project ID not found");
-
-      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    } catch (e) {
-      console.error("❌ Token Error:", e);
-    }
-  } else {
-    console.log("Push Notif membutuhkan perangkat fisik");
-  }
-
-  return token;
 }
 
 const styles = StyleSheet.create({

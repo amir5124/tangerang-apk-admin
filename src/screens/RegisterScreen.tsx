@@ -1,14 +1,23 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as Google from "expo-auth-session/providers/google";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TextStyle, ToastAndroid, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TextStyle,
+  ToastAndroid,
+  TouchableOpacity,
+  View
+} from "react-native";
 import API from "../utils/api";
 import { storage } from "../utils/storage";
 import { registerForPushNotificationsAsync } from "../utils/usePushNotifications";
-
-WebBrowser.maybeCompleteAuthSession();
 
 const RegisterScreen = () => {
   const router = useRouter();
@@ -28,13 +37,12 @@ const RegisterScreen = () => {
     role: (params.role as string) || "admin",
   });
 
-  const isFormValid = form.full_name.trim().length > 0 && form.email.trim().includes("@") && form.phone_number.length > 0 && form.password.length >= 6 && form.password === confirmPassword;
-
-  const [request, googleResponse, promptAsync] = Google.useIdTokenAuthRequest({
-    webClientId: "206607018424-u9a7v54du628kt7mmnlcclsvq3og33ce.apps.googleusercontent.com",
-    iosClientId: "CLIENT_ID_IOS.apps.googleusercontent.com",
-    androidClientId: "CLIENT_ID_ANDROID.apps.googleusercontent.com",
-  });
+  const isFormValid = 
+    form.full_name.trim().length > 0 && 
+    form.email.trim().includes("@") && 
+    form.phone_number.length > 0 && 
+    form.password.length >= 6 && 
+    form.password === confirmPassword;
 
   useEffect(() => {
     getDeviceToken();
@@ -73,35 +81,6 @@ const RegisterScreen = () => {
     }
   };
 
-  useEffect(() => {
-    if (googleResponse?.type === "success") {
-      const { id_token } = googleResponse.params;
-      handleGoogleLoginBackend(id_token);
-    }
-  }, [googleResponse]);
-
-  const handleGoogleLoginBackend = async (idToken: string) => {
-    setLoading(true);
-    try {
-      const response = await API.post("/auth/google", {
-        idToken,
-        role: form.role,
-        targetRole: form.role,
-        fcm_token: fcmToken,
-      });
-
-      if (response.data.token) {
-        await storage.save("userToken", response.data.token);
-        await storage.save("userData", JSON.stringify(response.data.user));
-        router.replace("/(tabs)");
-      }
-    } catch (error) {
-      Alert.alert("Gagal", "Login Google bermasalah");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleRegister = async () => {
     if (!isFormValid) return;
 
@@ -118,7 +97,10 @@ const RegisterScreen = () => {
       if (response.status === 201 || response.status === 200) {
         const { token, user } = response.data;
 
-        await Promise.all([storage.save("userToken", token), storage.save("userData", JSON.stringify(user))]);
+        await Promise.all([
+          storage.save("userToken", token), 
+          storage.save("userData", JSON.stringify(user))
+        ]);
         router.replace("/(tabs)");
       }
     } catch (error) {
@@ -135,6 +117,7 @@ const RegisterScreen = () => {
       setLoading(false);
     }
   };
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
       <View style={styles.topHeader}>
@@ -176,7 +159,6 @@ const RegisterScreen = () => {
           </View>
           <Text style={styles.hintText}>Contoh: 08123xxxxx</Text>
 
-          {/* Email */}
           <Text style={styles.label}>Email</Text>
           <View style={styles.inputWrapper}>
             <TextInput
@@ -223,7 +205,11 @@ const RegisterScreen = () => {
           </View>
           <Text style={styles.hintText}>Pastikan kata sandi anda sesuai</Text>
 
-          <TouchableOpacity style={[styles.btnAction, isFormValid ? styles.btnActive : styles.btnDisabled]} onPress={handleRegister} disabled={!isFormValid || loading}>
+          <TouchableOpacity 
+            style={[styles.btnAction, isFormValid ? styles.btnActive : styles.btnDisabled]} 
+            onPress={handleRegister} 
+            disabled={!isFormValid || loading}
+          >
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnActionText}>Daftar</Text>}
           </TouchableOpacity>
 
@@ -232,11 +218,6 @@ const RegisterScreen = () => {
               Dengan klik <Text style={{ fontWeight: "700", color: "#333" }}>Daftar</Text>, saya menyetujui <Text style={styles.linkText}>kebijakan dan privasi</Text>
             </Text>
           </View>
-
-          <TouchableOpacity style={[styles.btnAction, styles.btnGoogle]} onPress={() => promptAsync()} disabled={!request || loading}>
-            <Ionicons name="logo-google" size={20} color="#333" style={{ marginRight: 10 }} />
-            <Text style={styles.btnGoogleText}>Daftar dengan Google</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -254,8 +235,6 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
     backgroundColor: "#FFF",
   },
-  btnGoogle: { backgroundColor: "#FFF", borderWidth: 1, borderColor: "#DDD", flexDirection: "row" },
-  btnGoogleText: { color: "#333", fontWeight: "700" },
   headerTitle: { fontSize: 18, fontWeight: "700", color: "#333" },
   formSection: { marginTop: 10 },
   label: { fontSize: 16, fontWeight: "700", color: "#333", marginTop: 15, marginBottom: 8 },
@@ -287,12 +266,6 @@ const styles = StyleSheet.create({
   btnActive: { backgroundColor: "#633594" },
   btnDisabled: { backgroundColor: "#E0E0E0" },
   btnActionText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
-  btnOutline: {
-    borderWidth: 1.5,
-    borderColor: "#E91E63",
-    backgroundColor: "#FFF",
-  },
-  btnOutlineText: { color: "#E91E63", fontSize: 16, fontWeight: "700" },
   termsContainer: { marginTop: 30, alignItems: "center", paddingHorizontal: 10 },
   termsText: { textAlign: "center", fontSize: 13, color: "#888", lineHeight: 20 },
   linkText: { color: "#00ACC1", textDecorationLine: "underline" },

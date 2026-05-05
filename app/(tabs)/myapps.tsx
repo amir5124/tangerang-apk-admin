@@ -44,13 +44,13 @@ export default function MyAppsScreen() {
   const [newService, setNewService] = useState({ key: "", name: "" });
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [newNameValue, setNewNameValue] = useState("");
-  
+
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [selectedVoucher, setSelectedVoucher] = useState<any>(null);
   const [serviceFee, setServiceFee] = useState("");
   const [adminFee, setAdminFee] = useState("");
   const [isSavingFee, setIsSavingFee] = useState(false);
-  
+
   // State Voucher
   const [modalVisible, setModalVisible] = useState(false);
   const [formCode, setFormCode] = useState("");
@@ -142,7 +142,7 @@ export default function MyAppsScreen() {
           image_data: base64,
           file_name: `voucher_${formCode || 'new'}.jpg`,
         });
-        setFormImageUrl(res.data.url); 
+        setFormImageUrl(res.data.url);
         Toast.show({ type: 'success', text1: 'Gambar Voucher Terpilih' });
       } catch (error) {
         Toast.show({ type: 'error', text1: 'Gagal upload gambar voucher' });
@@ -266,7 +266,7 @@ export default function MyAppsScreen() {
   return (
     <View className="flex-1 bg-[#F5F7FA]">
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
-        
+
         {/* HEADER */}
         <View className="bg-white px-5 pt-14 pb-6 ">
           <Text className="text-2xl font-black text-gray-800">Kontrol Aplikasi</Text>
@@ -286,7 +286,7 @@ export default function MyAppsScreen() {
               return (
                 <View key={id} className="bg-white p-3 rounded-2xl mr-3 border border-gray-100 w-56 ">
                   <View className="h-28 bg-gray-50 rounded-xl justify-center items-center mb-2 overflow-hidden">
-                    {uploadingKey === key ? <ActivityIndicator color="#633594" /> : 
+                    {uploadingKey === key ? <ActivityIndicator color="#633594" /> :
                       asset?.image_url ? <Image source={{ uri: `https://backend.tangerangfast.online${asset.image_url}` }} className="w-full h-full" /> : <ImagePlus size={20} color="#cbd5e1" />}
                   </View>
                   <Pressable onPress={() => pickAndUpload(key)} className="bg-purple-50 p-2 rounded-xl flex-row justify-center items-center">
@@ -312,7 +312,7 @@ export default function MyAppsScreen() {
               return (
                 <View key={id} className="flex-1 bg-white p-4 rounded-2xl items-center  border border-gray-100">
                   <Pressable onPress={() => pickAndUpload(key)} className="w-16 h-16 bg-gray-50 rounded-2xl mb-3 justify-center items-center overflow-hidden border border-gray-100">
-                    {uploadingKey === key ? <ActivityIndicator color="#633594" /> : 
+                    {uploadingKey === key ? <ActivityIndicator color="#633594" /> :
                       asset?.image_url ? <Image source={{ uri: `https://backend.tangerangfast.online${asset.image_url}` }} className="w-full h-full" /> : <Star size={20} color="#cbd5e1" />}
                   </Pressable>
                   <Pressable onPress={() => { setSelectedAsset(asset); setNewNameValue(asset?.display_name || ""); setEditNameModal(true); }} className="bg-purple-100 px-3 py-1 rounded-full flex-row items-center">
@@ -327,27 +327,27 @@ export default function MyAppsScreen() {
 
         {/* 3. MENU LAYANAN */}
         <View className="px-4 mt-8">
-         <View className="flex-row justify-between items-center mb-3 px-1">
-  {/* SISI KIRI: Icon & Judul */}
-  <View className="flex-row items-center">
-    <LayoutGrid size={18} color="#633594" />
-    <Text className="text-lg font-bold ml-2 text-gray-800">Menu Layanan</Text>
-  </View>
+          <View className="flex-row justify-between items-center mb-3 px-1">
+            {/* SISI KIRI: Icon & Judul */}
+            <View className="flex-row items-center">
+              <LayoutGrid size={18} color="#633594" />
+              <Text className="text-lg font-bold ml-2 text-gray-800">Menu Layanan</Text>
+            </View>
 
-  {/* SISI KANAN: Tombol Tambah */}
-  <Pressable 
-    onPress={() => setAddServiceModal(true)} 
-    className="bg-[#633594] px-4 py-1.5 rounded-full active:opacity-70"
-  >
-    <Text className="text-white text-[10px] font-bold">+ LAYANAN</Text>
-  </Pressable>
-</View>
+            {/* SISI KANAN: Tombol Tambah */}
+            <Pressable
+              onPress={() => setAddServiceModal(true)}
+              className="bg-[#633594] px-4 py-1.5 rounded-full active:opacity-70"
+            >
+              <Text className="text-white text-[10px] font-bold">+ LAYANAN</Text>
+            </Pressable>
+          </View>
           <View className="bg-white rounded-2xl p-4 flex-row flex-wrap justify-between  border border-gray-100">
             {assets?.filter(a => a.key_name.startsWith('icon_')).map((asset) => (
               <View key={asset.id} className="w-[23%] items-center mb-5">
                 <View className="relative">
                   <Pressable onPress={() => pickAndUpload(asset.key_name)} className="w-12 h-12 bg-gray-50 rounded-xl justify-center items-center border border-gray-100 overflow-hidden">
-                    {uploadingKey === asset.key_name ? <ActivityIndicator size="small" color="#633594" /> : 
+                    {uploadingKey === asset.key_name ? <ActivityIndicator size="small" color="#633594" /> :
                       asset.image_url ? <Image source={{ uri: `https://backend.tangerangfast.online${asset.image_url}` }} className="w-full h-full" resizeMode="contain" /> : <ImagePlus size={16} color="#cbd5e1" />}
                   </Pressable>
                   <Pressable onPress={() => setModalDelete({ visible: true, id: asset.id, name: asset.display_name })} className="absolute -top-2 -left-2 bg-red-500 p-1 rounded-full border border-white">
@@ -356,7 +356,7 @@ export default function MyAppsScreen() {
                 </View>
                 <Pressable onPress={() => { setSelectedAsset(asset); setNewNameValue(asset.display_name); setEditNameModal(true); }} className="mt-1 flex-row items-center">
                   <Text numberOfLines={1} className="text-[9px] font-bold text-gray-500">{asset.display_name}</Text>
-                  <Pencil size={6} color="#94a3b8" style={{marginLeft: 2}} />
+                  <Pencil size={6} color="#94a3b8" style={{ marginLeft: 2 }} />
                 </Pressable>
               </View>
             ))}
@@ -376,7 +376,7 @@ export default function MyAppsScreen() {
               return (
                 <>
                   <View className="h-32 bg-gray-50 rounded-xl mb-3 justify-center items-center overflow-hidden border border-dashed border-gray-200">
-                    {uploadingKey === key ? <ActivityIndicator color="#633594" /> : 
+                    {uploadingKey === key ? <ActivityIndicator color="#633594" /> :
                       asset?.image_url ? <Image source={{ uri: `https://backend.tangerangfast.online${asset.image_url}` }} className="w-full h-full" /> : <ImagePlus size={24} color="#cbd5e1" />}
                   </View>
                   <Pressable onPress={() => pickAndUpload(key)} className="bg-[#633594] py-3 rounded-xl flex-row justify-center items-center">
@@ -396,7 +396,7 @@ export default function MyAppsScreen() {
               <Ticket size={18} color="#633594" />
               <Text className="text-lg font-bold ml-2">Manajemen Voucher</Text>
             </View>
-            <Pressable 
+            <Pressable
               onPress={() => {
                 setSelectedVoucher(null);
                 setFormCode("");
@@ -407,7 +407,7 @@ export default function MyAppsScreen() {
                 setFormDescription("");
                 setFormImageUrl("");
                 setModalVisible(true);
-              }} 
+              }}
               className="bg-[#633594] px-4 py-1.5 rounded-full"
             >
               <Text className="text-white text-[10px] font-bold">+ VOUCHER</Text>
@@ -419,7 +419,7 @@ export default function MyAppsScreen() {
                 <View className="flex-1">
                   <View className="flex-row items-center">
                     <Text className="font-black text-[#633594] text-base">{v.code}</Text>
-                    <Pressable 
+                    <Pressable
                       onPress={() => {
                         setSelectedVoucher(v);
                         setFormCode(v.code);
@@ -430,7 +430,7 @@ export default function MyAppsScreen() {
                         setFormDescription(v.description || "");
                         setFormImageUrl(v.image_url || "");
                         setModalVisible(true);
-                      }} 
+                      }}
                       className="ml-2 p-1.5 bg-purple-50 rounded-full"
                     >
                       <Pencil size={12} color="#633594" />
@@ -443,10 +443,10 @@ export default function MyAppsScreen() {
                     Disc {v.discount_percent}% • Min. Rp{parseInt(v.min_purchase || 0).toLocaleString('id-ID')}
                   </Text>
                 </View>
-                <Switch 
-                  value={v.is_active === 1} 
+                <Switch
+                  value={v.is_active === 1}
                   onValueChange={() => handleToggleVoucher(v.id, v.is_active)}
-                  trackColor={{ true: '#633594', false: '#cbd5e1' }} 
+                  trackColor={{ true: '#633594', false: '#cbd5e1' }}
                 />
               </View>
             ))}
@@ -499,7 +499,7 @@ export default function MyAppsScreen() {
       </ScrollView>
 
       {/* --- MODALS --- */}
-      
+
       {/* Modal Voucher (Create & Edit) */}
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
         <View className="flex-1 justify-end bg-black/50">
@@ -513,18 +513,18 @@ export default function MyAppsScreen() {
               </View>
 
               <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Gambar Promo (Opsional)</Text>
-              <Pressable 
+              <Pressable
                 onPress={pickVoucherImage}
                 className="h-32 bg-gray-50 rounded-xl mb-4 justify-center items-center overflow-hidden border border-dashed border-gray-200"
               >
-                {isUploadingVoucher ? <ActivityIndicator color="#633594" /> : 
-                  formImageUrl ? <Image source={{ uri: `https://backend.tangerangfast.online${formImageUrl}` }} className="w-full h-full" /> : 
-                  <View className="items-center"><ImagePlus size={24} color="#cbd5e1" /><Text className="text-[10px] text-gray-400 mt-1">Upload Banner</Text></View>}
+                {isUploadingVoucher ? <ActivityIndicator color="#633594" /> :
+                  formImageUrl ? <Image source={{ uri: `https://backend.tangerangfast.online${formImageUrl}` }} className="w-full h-full" /> :
+                    <View className="items-center"><ImagePlus size={24} color="#cbd5e1" /><Text className="text-[10px] text-gray-400 mt-1">Upload Banner</Text></View>}
               </Pressable>
 
               <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Kode Voucher</Text>
               <TextInput className="bg-gray-50 p-4 rounded-xl mb-4 border border-gray-100 font-bold text-[#633594]" value={formCode} onChangeText={setFormCode} autoCapitalize="characters" />
-              
+
               <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Deskripsi Promo</Text>
               <TextInput multiline className="bg-gray-50 p-4 rounded-xl mb-4 border border-gray-100" placeholder="Jelaskan detail promo..." value={formDescription} onChangeText={setFormDescription} />
 
@@ -599,8 +599,8 @@ export default function MyAppsScreen() {
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-[30px] p-6 pb-10">
             <Text className="text-xl font-bold mb-6 text-gray-800">Tambah Layanan Baru</Text>
-            <TextInput placeholder="Nama Layanan (e.g. Cuci AC)" className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4" value={newService.name} onChangeText={t => setNewService(p => ({...p, name: t}))} />
-            <TextInput placeholder="Kode Unik (e.g. pijat)" autoCapitalize="none" className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6" value={newService.key} onChangeText={t => setNewService(p => ({...p, key: t}))} />
+            <TextInput placeholder="Nama Layanan (e.g. Cuci AC)" className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4" value={newService.name} onChangeText={t => setNewService(p => ({ ...p, name: t }))} />
+            <TextInput placeholder="Kode Unik (e.g. pijat)" autoCapitalize="none" className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6" value={newService.key} onChangeText={t => setNewService(p => ({ ...p, key: t }))} />
             <Pressable onPress={handleCreateService} className="bg-[#633594] py-4 rounded-xl items-center shadow-lg"><Text className="text-white font-bold">SIMPAN LAYANAN</Text></Pressable>
             <Pressable onPress={() => setAddServiceModal(false)} className="mt-4 items-center"><Text className="text-gray-400 font-bold">Batal</Text></Pressable>
           </View>

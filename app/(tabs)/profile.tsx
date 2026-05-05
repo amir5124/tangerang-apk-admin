@@ -117,10 +117,10 @@ export default function AdminUserList() {
         <View className="flex-1 ml-4">
           <Text className="text-gray-800 font-bold text-base">{item.full_name}</Text>
           <Text className="text-gray-400 text-xs">{item.email}</Text>
-          <div className="flex flex-row items-center mt-1">
+          <View className="flex flex-row items-center mt-1">
             <Phone size={12} color="#94a3b8" />
             <Text className="text-gray-500 text-xs ml-1">{item.phone_number || "-"}</Text>
-          </div>
+          </View>
         </View>
         <View className="px-3 py-1 rounded-full bg-slate-100">
           <Text className="text-[10px] font-bold text-slate-600">{item.role?.toUpperCase()}</Text>
