@@ -36,7 +36,6 @@ export async function registerForPushNotificationsAsync() {
     lightColor: "#FF231F7C",
     showBadge: true,
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-    // Cukup tulis nama filenya saja
     sound: "notification", 
   });
 }
