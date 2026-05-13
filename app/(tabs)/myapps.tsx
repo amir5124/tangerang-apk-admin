@@ -489,7 +489,16 @@ export default function MyAppsScreen() {
                 </Pressable>
               ))}
             </View>
-            <TextInput multiline numberOfLines={3} placeholder="Tulis pesan..." className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-3" value={message} onChangeText={setMessage} />
+            <TextInput
+              multiline
+              numberOfLines={3}
+              placeholder="Tulis pesan..."
+              // textAlignVertical penting agar di Android teks mulai dari atas, bukan tengah
+              style={{ textAlignVertical: 'top' }}
+              className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-3 min-h-[100px]"
+              value={message}
+              onChangeText={setMessage}
+            />
             <Pressable onPress={handleSendBroadcast} disabled={loading} className={`py-4 rounded-xl items-center ${loading ? 'bg-gray-300' : 'bg-[#633594]'}`}>
               <Text className="text-white font-bold">KIRIM SEKARANG</Text>
             </Pressable>

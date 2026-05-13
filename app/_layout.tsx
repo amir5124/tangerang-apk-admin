@@ -119,59 +119,62 @@ function RootLayoutContent() {
   const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
 
   const handleRedirect = (data: any) => {
-  if (!data) return;
+    if (!data) return;
 
-  console.log("🔔 Redirecting with data:", data);
+    console.log("🔔 Redirecting with data:", data);
 
-  // Jika tujuan adalah Tab Profile
-  if (data.type === "NEW_USER" || data.screen === "/(tabs)/profile") {
-    // Gunakan replace untuk berpindah antar tab utama
-    router.replace("/(tabs)/profile");
-  } 
-  else if (data.orderId) {
-    router.push(`/order/${data.orderId}`);
-  } 
-  else if (data.screen) {
-    // Pastikan path screen diawali dengan /
-    const target = data.screen.startsWith('/') ? data.screen : `/${data.screen}`;
-    router.push(target);
-  }
-};
+    // Jika tujuan adalah Tab Profile
+    if (data.type === "NEW_USER" || data.screen === "/(tabs)/profile") {
+      // Gunakan replace untuk berpindah antar tab utama
+      router.replace("/(tabs)/profile");
+    }
+    else if (data.orderId) {
+      router.push(`/order/${data.orderId}`);
+    }
+    else if (data.screen) {
+      // Pastikan path screen diawali dengan /
+      const target = data.screen.startsWith('/') ? data.screen : `/${data.screen}`;
+      router.push(target);
+    }
+  };
 
   useEffect(() => {
-    registerForPushNotificationsAsync().then((token) => {
-      if (token) console.log("✅ Native FCM Token:", token);
-    });
-
-    Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) {
-        const data = response.notification.request.content.data;
-        setTimeout(() => handleRedirect(data), 1000);
-      }
-    });
-
-    // Pasang listener
-    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-      const { title, body, data } = notification.request.content;
-      Toast.show({
-        type: "success",
-        text1: title || "Informasi Baru",
-        text2: body || "Ada pembaruan data",
-        onPress: () => handleRedirect(data),
+    // Hanya jalankan logika push notification jika BUKAN di web
+    if (Platform.OS !== 'web') {
+      registerForPushNotificationsAsync().then((token) => {
+        if (token) console.log("✅ Native FCM Token:", token);
       });
-    });
 
-    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data;
-      handleRedirect(data);
-    });
+      Notifications.getLastNotificationResponseAsync().then((response) => {
+        if (response) {
+          const data = response.notification.request.content.data;
+          setTimeout(() => handleRedirect(data), 1000);
+        }
+      });
 
-    // Cleanup aman tanpa garis merah
+      notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
+        const { title, body, data } = notification.request.content;
+        Toast.show({
+          type: "success",
+          text1: title || "Informasi Baru",
+          text2: body || "Ada pembaruan data",
+          onPress: () => handleRedirect(data),
+        });
+      });
+
+      responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+        const data = response.notification.request.content.data;
+        handleRedirect(data);
+      });
+    }
+
     return () => {
-      notificationListener.current?.remove();
-      responseListener.current?.remove();
+      if (Platform.OS !== 'web') {
+        notificationListener.current?.remove();
+        responseListener.current?.remove();
+      }
     };
-  }, [])
+  }, []);
 
   return (
     <View style={styles.container}>
