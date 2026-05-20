@@ -71,6 +71,7 @@ export default function MyAppsScreen() {
   // States: Broadcast
   const [target, setTarget] = useState<"user" | "mitra">("user");
   const [message, setMessage] = useState("");
+  const [broadcastTitle, setBroadcastTitle] = useState("");
 
   // Definisikan urutan menu
   const menuOrder = [
@@ -287,17 +288,21 @@ export default function MyAppsScreen() {
   };
 
   const handleSendBroadcast = async () => {
-    if (!message.trim()) return;
+    if (!message.trim() || !broadcastTitle.trim()) {
+      Toast.show({ type: 'error', text1: 'Gagal', text2: 'Judul dan pesan harus diisi' });
+      return;
+    }
     setLoading(true);
     try {
       await api.post("/notifications/broadcast", {
         targetTopic: target === "user" ? "all_customer" : "all_mitra",
-        title: "Pengumuman",
+        title: broadcastTitle,
         body: message,
         data: { type: "BROADCAST" },
       });
       Toast.show({ type: 'success', text1: 'Berhasil', text2: 'Pesan terkirim' });
       setMessage("");
+      setBroadcastTitle("");
     } catch (e) {
       Toast.show({ type: 'error', text1: 'Gagal', text2: 'Broadcast gagal dikirim' });
     } finally {
@@ -674,6 +679,15 @@ export default function MyAppsScreen() {
                 </Pressable>
               ))}
             </View>
+
+            {/* Title Input Field */}
+            <TextInput
+              placeholder="Judul Pengumuman"
+              className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-3"
+              value={broadcastTitle}
+              onChangeText={setBroadcastTitle}
+            />
+
             <TextInput
               multiline
               numberOfLines={3}
