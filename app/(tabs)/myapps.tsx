@@ -73,6 +73,18 @@ export default function MyAppsScreen() {
   const [message, setMessage] = useState("");
   const [broadcastTitle, setBroadcastTitle] = useState("");
 
+  // =============================================
+  // NEW STATES: Gambar untuk modal Tambah Layanan
+  // =============================================
+  const [newServiceImageUri, setNewServiceImageUri] = useState<string | null>(null);
+  const [newServiceImageBase64, setNewServiceImageBase64] = useState<string | null>(null);
+  const [isUploadingNewService, setIsUploadingNewService] = useState(false);
+
+  // NEW STATES: Gambar untuk modal Tambah Menu Lainnya
+  const [newOtherImageUri, setNewOtherImageUri] = useState<string | null>(null);
+  const [newOtherImageBase64, setNewOtherImageBase64] = useState<string | null>(null);
+  const [isUploadingNewOther, setIsUploadingNewOther] = useState(false);
+
   // Definisikan urutan menu
   const menuOrder = [
     'icon_ac',
@@ -88,7 +100,9 @@ export default function MyAppsScreen() {
   // Definisikan urutan menu lainnya
   const otherMenuOrder = [
     'popular_service_1',
-    'popular_service_2'
+    'popular_service_2',
+    'popular_service_paket',
+    'popular_service_pulsa'
   ];
 
   useEffect(() => {
@@ -227,15 +241,75 @@ export default function MyAppsScreen() {
     );
   };
 
+  // =============================================
+  // NEW: Pilih gambar untuk modal Tambah Layanan
+  // =============================================
+  const pickNewServiceImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.6,
+    });
+
+    if (!result.canceled) {
+      setIsUploadingNewService(true);
+      try {
+        const base64 = await getBase64(result.assets[0].uri);
+        setNewServiceImageUri(result.assets[0].uri);
+        setNewServiceImageBase64(base64);
+      } catch (error) {
+        Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal memuat gambar' });
+      } finally {
+        setIsUploadingNewService(false);
+      }
+    }
+  };
+
+  // NEW: Pilih gambar untuk modal Tambah Menu Lainnya
+  const pickNewOtherImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.6,
+    });
+
+    if (!result.canceled) {
+      setIsUploadingNewOther(true);
+      try {
+        const base64 = await getBase64(result.assets[0].uri);
+        setNewOtherImageUri(result.assets[0].uri);
+        setNewOtherImageBase64(base64);
+      } catch (error) {
+        Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal memuat gambar' });
+      } finally {
+        setIsUploadingNewOther(false);
+      }
+    }
+  };
+
   const handleCreateService = async () => {
     if (!newService.key || !newService.name) return;
     setLoading(true);
     try {
       const key = newService.key.startsWith('icon_') ? newService.key.toLowerCase() : `icon_${newService.key.toLowerCase().replace(/\s+/g, '_')}`;
       await api.post("/assets", { key_name: key, display_name: newService.name });
+
+      // Upload gambar jika ada
+      if (newServiceImageBase64) {
+        try {
+          await api.post("/assets/upload-base64", {
+            key_name: key,
+            image_data: newServiceImageBase64,
+            file_name: `${key}.jpg`,
+          });
+        } catch (imgErr) {
+          console.error("Gagal upload gambar layanan:", imgErr);
+        }
+      }
+
       Toast.show({ type: 'success', text1: 'Sukses', text2: 'Layanan ditambahkan' });
       setAddServiceModal(false);
       setNewService({ key: "", name: "" });
+      setNewServiceImageUri(null);
+      setNewServiceImageBase64(null);
       loadAssets();
     } finally {
       setLoading(false);
@@ -250,9 +324,25 @@ export default function MyAppsScreen() {
         ? newService.key.toLowerCase()
         : `popular_service_${newService.key.toLowerCase().replace(/\s+/g, '_')}`;
       await api.post("/assets", { key_name: key, display_name: newService.name });
+
+      // Upload gambar jika ada
+      if (newOtherImageBase64) {
+        try {
+          await api.post("/assets/upload-base64", {
+            key_name: key,
+            image_data: newOtherImageBase64,
+            file_name: `${key}.jpg`,
+          });
+        } catch (imgErr) {
+          console.error("Gagal upload gambar menu lainnya:", imgErr);
+        }
+      }
+
       Toast.show({ type: 'success', text1: 'Sukses', text2: 'Menu lainnya ditambahkan' });
       setAddOtherServiceModal(false);
       setNewService({ key: "", name: "" });
+      setNewOtherImageUri(null);
+      setNewOtherImageBase64(null);
       loadAssets();
     } finally {
       setLoading(false);
@@ -533,31 +623,7 @@ export default function MyAppsScreen() {
           </View>
         </View>
 
-        {/* 4. BANNER PROMO TENGAH */}
-        <View className="px-4 mt-8">
-          <View className="flex-row items-center mb-3">
-            <ImageIcon size={18} color="#633594" />
-            <Text className="text-lg font-bold ml-2">Banner Promo</Text>
-          </View>
-          <View className="bg-white p-4 rounded-2xl border border-gray-100">
-            {(() => {
-              const key = "banner_promo";
-              const asset = assets?.find(a => a.key_name === key);
-              return (
-                <>
-                  <View className="h-32 bg-gray-50 rounded-xl mb-3 justify-center items-center overflow-hidden border border-dashed border-gray-200">
-                    {uploadingKey === key ? <ActivityIndicator color="#633594" /> :
-                      asset?.image_url ? <Image source={{ uri: `https://backend.tangerangfast.online${asset.image_url}` }} className="w-full h-full" /> : <ImagePlus size={24} color="#cbd5e1" />}
-                  </View>
-                  <Pressable onPress={() => pickAndUpload(key)} className="bg-[#633594] py-3 rounded-xl flex-row justify-center items-center">
-                    <Pencil size={14} color="white" />
-                    <Text className="text-white font-bold ml-2">Update Banner Promo</Text>
-                  </Pressable>
-                </>
-              );
-            })()}
-          </View>
-        </View>
+
 
         {/* 5. VOUCHER */}
         <View className="px-4 mt-8">
@@ -900,28 +966,198 @@ export default function MyAppsScreen() {
         </View>
       </Modal>
 
-      {/* Modal Tambah Layanan */}
+      {/* ============================================================= */}
+      {/* Modal Tambah Layanan — UPDATED dengan upload gambar            */}
+      {/* ============================================================= */}
       <Modal visible={addServiceModal} transparent animationType="slide">
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-[30px] p-6 pb-10">
-            <Text className="text-xl font-bold mb-6 text-gray-800">Tambah Layanan Baru</Text>
-            <TextInput placeholder="Nama Layanan (e.g. Cuci AC)" className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4" value={newService.name} onChangeText={t => setNewService(p => ({ ...p, name: t }))} />
-            <TextInput placeholder="Kode Unik (e.g. pijat)" autoCapitalize="none" className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6" value={newService.key} onChangeText={t => setNewService(p => ({ ...p, key: t }))} />
-            <Pressable onPress={handleCreateService} className="bg-[#633594] py-4 rounded-xl items-center shadow-lg"><Text className="text-white font-bold">SIMPAN LAYANAN</Text></Pressable>
-            <Pressable onPress={() => setAddServiceModal(false)} className="mt-4 items-center"><Text className="text-gray-400 font-bold">Batal</Text></Pressable>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View className="flex-row justify-between items-center mb-6">
+                <Text className="text-xl font-bold text-gray-800">Tambah Layanan Baru</Text>
+                <Pressable
+                  onPress={() => {
+                    setAddServiceModal(false);
+                    setNewService({ key: "", name: "" });
+                    setNewServiceImageUri(null);
+                    setNewServiceImageBase64(null);
+                  }}
+                  className="p-2 bg-gray-100 rounded-full"
+                >
+                  <X size={18} color="#633594" />
+                </Pressable>
+              </View>
+
+              {/* Upload Gambar */}
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Gambar Icon Layanan</Text>
+              <Pressable
+                onPress={pickNewServiceImage}
+                className="h-32 bg-gray-50 rounded-xl mb-4 justify-center items-center overflow-hidden border border-dashed border-gray-200"
+              >
+                {isUploadingNewService ? (
+                  <ActivityIndicator color="#633594" />
+                ) : newServiceImageUri ? (
+                  <>
+                    <Image source={{ uri: newServiceImageUri }} className="w-full h-full" resizeMode="contain" />
+                    <View className="absolute inset-0 bg-black/40 justify-center items-center">
+                      <Pencil size={18} color="white" />
+                      <Text className="text-white text-[10px] font-bold mt-1">Tap untuk ganti</Text>
+                    </View>
+                  </>
+                ) : (
+                  <View className="items-center">
+                    <ImagePlus size={28} color="#cbd5e1" />
+                    <Text className="text-[11px] text-gray-400 mt-2 font-semibold">Tap untuk pilih gambar</Text>
+                    <Text className="text-[9px] text-gray-300 mt-0.5">PNG, JPG • Maks 5MB</Text>
+                  </View>
+                )}
+              </Pressable>
+              {newServiceImageUri && (
+                <Pressable
+                  onPress={() => { setNewServiceImageUri(null); setNewServiceImageBase64(null); }}
+                  className="flex-row items-center justify-center mb-4 -mt-2"
+                >
+                  <X size={12} color="#ef4444" />
+                  <Text className="text-[10px] text-red-400 ml-1 font-bold">Hapus gambar</Text>
+                </Pressable>
+              )}
+
+              {/* Nama Layanan */}
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Nama Layanan *</Text>
+              <TextInput
+                placeholder="Contoh: Cuci AC"
+                className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4"
+                value={newService.name}
+                onChangeText={t => setNewService(p => ({ ...p, name: t }))}
+              />
+
+              {/* Kode Unik */}
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Kode Unik *</Text>
+              <TextInput
+                placeholder="Contoh: pijat"
+                autoCapitalize="none"
+                className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6"
+                value={newService.key}
+                onChangeText={t => setNewService(p => ({ ...p, key: t }))}
+              />
+
+              <Pressable
+                onPress={handleCreateService}
+                disabled={!newService.key || !newService.name || loading}
+                className={`py-4 rounded-xl items-center shadow-lg ${!newService.key || !newService.name || loading ? 'bg-gray-300' : 'bg-[#633594]'}`}
+              >
+                <Text className="text-white font-bold">{loading ? "Menyimpan..." : "SIMPAN LAYANAN"}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setAddServiceModal(false);
+                  setNewService({ key: "", name: "" });
+                  setNewServiceImageUri(null);
+                  setNewServiceImageBase64(null);
+                }}
+                className="mt-4 items-center"
+              >
+                <Text className="text-gray-400 font-bold">Batal</Text>
+              </Pressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* Modal Tambah Menu Lainnya */}
+      {/* ============================================================= */}
+      {/* Modal Tambah Menu Lainnya — UPDATED dengan upload gambar       */}
+      {/* ============================================================= */}
       <Modal visible={addOtherServiceModal} transparent animationType="slide">
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-[30px] p-6 pb-10">
-            <Text className="text-xl font-bold mb-6 text-gray-800">Tambah Menu Lainnya</Text>
-            <TextInput placeholder="Nama Menu (e.g. Laundry)" className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4" value={newService.name} onChangeText={t => setNewService(p => ({ ...p, name: t }))} />
-            <TextInput placeholder="Kode Unik (e.g. laundry)" autoCapitalize="none" className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6" value={newService.key} onChangeText={t => setNewService(p => ({ ...p, key: t }))} />
-            <Pressable onPress={handleCreateOtherService} className="bg-[#633594] py-4 rounded-xl items-center shadow-lg"><Text className="text-white font-bold">SIMPAN MENU</Text></Pressable>
-            <Pressable onPress={() => setAddOtherServiceModal(false)} className="mt-4 items-center"><Text className="text-gray-400 font-bold">Batal</Text></Pressable>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View className="flex-row justify-between items-center mb-6">
+                <Text className="text-xl font-bold text-gray-800">Tambah Menu Lainnya</Text>
+                <Pressable
+                  onPress={() => {
+                    setAddOtherServiceModal(false);
+                    setNewService({ key: "", name: "" });
+                    setNewOtherImageUri(null);
+                    setNewOtherImageBase64(null);
+                  }}
+                  className="p-2 bg-gray-100 rounded-full"
+                >
+                  <X size={18} color="#633594" />
+                </Pressable>
+              </View>
+
+              {/* Upload Gambar */}
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Gambar Icon Menu</Text>
+              <Pressable
+                onPress={pickNewOtherImage}
+                className="h-32 bg-gray-50 rounded-xl mb-4 justify-center items-center overflow-hidden border border-dashed border-gray-200"
+              >
+                {isUploadingNewOther ? (
+                  <ActivityIndicator color="#633594" />
+                ) : newOtherImageUri ? (
+                  <>
+                    <Image source={{ uri: newOtherImageUri }} className="w-full h-full" resizeMode="contain" />
+                    <View className="absolute inset-0 bg-black/40 justify-center items-center">
+                      <Pencil size={18} color="white" />
+                      <Text className="text-white text-[10px] font-bold mt-1">Tap untuk ganti</Text>
+                    </View>
+                  </>
+                ) : (
+                  <View className="items-center">
+                    <ImagePlus size={28} color="#cbd5e1" />
+                    <Text className="text-[11px] text-gray-400 mt-2 font-semibold">Tap untuk pilih gambar</Text>
+                    <Text className="text-[9px] text-gray-300 mt-0.5">PNG, JPG • Maks 5MB</Text>
+                  </View>
+                )}
+              </Pressable>
+              {newOtherImageUri && (
+                <Pressable
+                  onPress={() => { setNewOtherImageUri(null); setNewOtherImageBase64(null); }}
+                  className="flex-row items-center justify-center mb-4 -mt-2"
+                >
+                  <X size={12} color="#ef4444" />
+                  <Text className="text-[10px] text-red-400 ml-1 font-bold">Hapus gambar</Text>
+                </Pressable>
+              )}
+
+              {/* Nama Menu */}
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Nama Menu *</Text>
+              <TextInput
+                placeholder="Contoh: Laundry"
+                className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4"
+                value={newService.name}
+                onChangeText={t => setNewService(p => ({ ...p, name: t }))}
+              />
+
+              {/* Kode Unik */}
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Kode Unik *</Text>
+              <TextInput
+                placeholder="Contoh: laundry"
+                autoCapitalize="none"
+                className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6"
+                value={newService.key}
+                onChangeText={t => setNewService(p => ({ ...p, key: t }))}
+              />
+
+              <Pressable
+                onPress={handleCreateOtherService}
+                disabled={!newService.key || !newService.name || loading}
+                className={`py-4 rounded-xl items-center shadow-lg ${!newService.key || !newService.name || loading ? 'bg-gray-300' : 'bg-[#633594]'}`}
+              >
+                <Text className="text-white font-bold">{loading ? "Menyimpan..." : "SIMPAN MENU"}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setAddOtherServiceModal(false);
+                  setNewService({ key: "", name: "" });
+                  setNewOtherImageUri(null);
+                  setNewOtherImageBase64(null);
+                }}
+                className="mt-4 items-center"
+              >
+                <Text className="text-gray-400 font-bold">Batal</Text>
+              </Pressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -974,19 +1210,6 @@ export default function MyAppsScreen() {
                 </Pressable>
               </View>
             </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Modal Tambah Menu Lainnya */}
-      <Modal visible={addOtherServiceModal} transparent animationType="slide">
-        <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white rounded-t-[30px] p-6 pb-10">
-            <Text className="text-xl font-bold mb-6 text-gray-800">Tambah Menu Lainnya</Text>
-            <TextInput placeholder="Nama Menu (e.g. Laundry)" className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4" value={newService.name} onChangeText={t => setNewService(p => ({ ...p, name: t }))} />
-            <TextInput placeholder="Kode Unik (e.g. laundry)" autoCapitalize="none" className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6" value={newService.key} onChangeText={t => setNewService(p => ({ ...p, key: t }))} />
-            <Pressable onPress={handleCreateOtherService} className="bg-[#633594] py-4 rounded-xl items-center shadow-lg"><Text className="text-white font-bold">SIMPAN MENU</Text></Pressable>
-            <Pressable onPress={() => setAddOtherServiceModal(false)} className="mt-4 items-center"><Text className="text-gray-400 font-bold">Batal</Text></Pressable>
           </View>
         </View>
       </Modal>

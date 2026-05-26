@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { AlertTriangle, Download, LogOut, Phone, RefreshCw, Search, Store, UserCheck, Users, XCircle } from "lucide-react-native";
+import { AlertTriangle, Ban, Download, LogOut, Phone, RefreshCw, Search, Store, UserCheck, Users, XCircle } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator, Alert, FlatList, Modal, Platform,
@@ -82,6 +82,12 @@ export default function AdminUserList() {
   const [newStatus, setNewStatus] = useState<"pending" | "rejected">("pending");
   const [changeStatusReason, setChangeStatusReason] = useState("");
   const [isChangingStatus, setIsChangingStatus] = useState(false);
+
+  // NEW: State untuk modal Suspend
+  const [suspendModal, setSuspendModal] = useState(false);
+  const [suspendMitra, setSuspendMitra] = useState<any>(null);
+  const [suspendReason, setSuspendReason] = useState("");
+  const [isSuspending, setIsSuspending] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -193,11 +199,50 @@ export default function AdminUserList() {
     }
   };
 
+  // NEW: Fungsi untuk suspend mitra (sama seperti reject)
+  const executeSuspend = async () => {
+    if (!suspendMitra) return;
+    const storeId = getStoreId(suspendMitra);
+
+    setIsSuspending(true);
+    try {
+      if (!hasStore(suspendMitra)) {
+        await executeRejectUser(suspendMitra.id, suspendReason.trim() || "Akun di-suspend oleh admin");
+      } else {
+        if (!storeId) {
+          Toast.show({ type: "error", text1: "Error", text2: "ID Toko tidak ditemukan" });
+          return;
+        }
+        const response = await api.put(`/mitra/reject/${storeId}`, {
+          rejection_reason: suspendReason.trim() || "Akun di-suspend oleh admin",
+        });
+        if (response.data.success) {
+          Toast.show({ type: "success", text1: "Berhasil", text2: "Mitra telah di-suspend" });
+          fetchUsers();
+        }
+      }
+    } catch (error: any) {
+      Toast.show({ type: "error", text1: "Gagal", text2: error.response?.data?.message || "Terjadi kesalahan server" });
+    } finally {
+      setIsSuspending(false);
+      setSuspendModal(false);
+      setSuspendReason("");
+      setSuspendMitra(null);
+    }
+  };
+
   // ── handleRejectMitra: selalu buka modal (tidak pakai Alert/prompt) ────────
   const handleRejectMitra = (item: any) => {
     setRejectMitra(item);
     setRejectionReason("");
     setRejectModal(true);
+  };
+
+  // NEW: Handler untuk suspend mitra
+  const handleSuspendMitra = (item: any) => {
+    setSuspendMitra(item);
+    setSuspendReason("");
+    setSuspendModal(true);
   };
 
   const executeRevertToPending = async () => {
@@ -377,7 +422,7 @@ export default function AdminUserList() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case "approved": return "DISETUJUI";
-      case "rejected": return "DITOLAK";
+      case "rejected": return "DITOLAK / SUSPEND";
       case "pending_registration": return "BELUM DAFTAR TOKO";
       default: return "PENDING";
     }
@@ -455,6 +500,14 @@ export default function AdminUserList() {
               <Pressable onPress={() => handleRejectMitra(item)} className="flex-1 bg-red-50 py-2.5 rounded-xl flex-row items-center justify-center gap-2">
                 <XCircle size={16} color="#dc2626" />
                 <Text className="text-xs font-bold text-red-600">TOLAK</Text>
+              </Pressable>
+            )}
+
+            {/* TOMBOL SUSPEND - Untuk mitra yang sudah approved */}
+            {item.store_status === "approved" && (
+              <Pressable onPress={() => handleSuspendMitra(item)} className="flex-1 bg-red-50 py-2.5 rounded-xl flex-row items-center justify-center gap-2">
+                <Ban size={16} color="#dc2626" />
+                <Text className="text-xs font-bold text-red-600">SUSPEND</Text>
               </Pressable>
             )}
 
@@ -579,6 +632,57 @@ export default function AdminUserList() {
               >
                 {isRejecting && <ActivityIndicator size="small" color="#fff" />}
                 <Text className="font-bold text-white">{isRejecting ? "Memproses..." : "Tolak"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* NEW: Modal Suspend Mitra */}
+      <Modal visible={suspendModal} transparent animationType="fade">
+        <View className="flex-1 justify-center items-center bg-black/60 px-8">
+          <View className="bg-white w-full rounded-3xl p-6">
+            <View className="flex-row items-center gap-2 mb-2">
+              <Ban size={24} color="#dc2626" />
+              <Text className="text-lg font-bold text-gray-800">Suspend Mitra</Text>
+            </View>
+            <Text className="text-sm text-gray-400 mb-5">
+              {suspendMitra?.store_name || suspendMitra?.full_name || "-"} · Mitra akan di-suspend dan tidak dapat menerima order
+            </Text>
+            <Text className="text-[10px] font-bold text-gray-400 mb-1 uppercase">Alasan Suspend</Text>
+            <View className="bg-gray-50 rounded-xl border border-gray-100 px-4 mb-5">
+              <TextInput
+                className="py-3 text-gray-700 min-h-[80px]"
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                value={suspendReason}
+                onChangeText={setSuspendReason}
+                placeholder="Contoh: Melanggar ketentuan, komplain pelanggan, penipuan, dll..."
+                placeholderTextColor="#94a3b8"
+                editable={!isSuspending}
+              />
+            </View>
+            <View className="bg-red-50 rounded-xl p-3 mb-5">
+              <Text className="text-xs text-red-700 text-center">
+                ⚠️ Mitra yang di-suspend tidak akan bisa menerima pesanan baru. Status akan berubah menjadi DITOLAK / SUSPEND.
+              </Text>
+            </View>
+            <View className="flex-row gap-3">
+              <Pressable
+                onPress={() => { setSuspendModal(false); setSuspendReason(""); setSuspendMitra(null); }}
+                disabled={isSuspending}
+                className="flex-1 py-3 bg-gray-100 rounded-xl items-center"
+              >
+                <Text className="font-bold text-gray-600">Batal</Text>
+              </Pressable>
+              <Pressable
+                onPress={executeSuspend}
+                disabled={isSuspending}
+                className={`flex-1 py-3 rounded-xl items-center flex-row justify-center gap-2 ${isSuspending ? "bg-gray-300" : "bg-red-600"}`}
+              >
+                {isSuspending && <ActivityIndicator size="small" color="#fff" />}
+                <Text className="font-bold text-white">{isSuspending ? "Memproses..." : "Suspend"}</Text>
               </Pressable>
             </View>
           </View>
