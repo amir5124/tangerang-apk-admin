@@ -1,8 +1,13 @@
 import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import {
+  CheckSquare,
+  Eye, EyeOff,
   Image as ImageIcon, ImagePlus, LayoutGrid, Megaphone,
-  Pencil, Settings, Star, Ticket,
+  MessageCircle,
+  Pencil, Settings,
+  Square,
+  Star, Ticket,
   Trash2, X
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
@@ -85,6 +90,15 @@ export default function MyAppsScreen() {
   const [newOtherImageBase64, setNewOtherImageBase64] = useState<string | null>(null);
   const [isUploadingNewOther, setIsUploadingNewOther] = useState(false);
 
+  // =============================================
+  // NEW STATES: Manajemen Review
+  // =============================================
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [selectedReviews, setSelectedReviews] = useState<Set<number>>(new Set());
+  const [reviewStats, setReviewStats] = useState<any>(null);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [isSelectAll, setIsSelectAll] = useState(false);
+
   // Definisikan urutan menu
   const menuOrder = [
     'icon_ac',
@@ -107,6 +121,8 @@ export default function MyAppsScreen() {
 
   useEffect(() => {
     initData();
+    fetchAllReviews();
+    fetchReviewStats();
   }, []);
 
   const initData = async () => {
@@ -137,6 +153,95 @@ export default function MyAppsScreen() {
       if (sf.data.success) setServiceFee(sf.data.value);
       if (af.data.success) setAdminFee(af.data.value);
     } catch (e) { console.error(e); }
+  };
+
+  // --- REVIEW FUNCTIONS ---
+  const fetchAllReviews = async () => {
+    setLoadingReviews(true);
+    try {
+      const response = await api.get("/reviews/admin/all");
+      if (response.data.success) {
+        setReviews(response.data.reviews);
+      }
+    } catch (error) {
+      console.error("Gagal mengambil reviews:", error);
+      Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal mengambil data review' });
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  const fetchReviewStats = async () => {
+    try {
+      const response = await api.get("/reviews/admin/statistics");
+      if (response.data.success) {
+        setReviewStats(response.data.statistics);
+      }
+    } catch (error) {
+      console.error("Gagal mengambil statistik review:", error);
+    }
+  };
+
+  const toggleReviewDisplay = async (reviewId: number, currentStatus: number) => {
+    try {
+      const response = await api.put(`/reviews/admin/toggle/${reviewId}`, {
+        is_displayed: currentStatus === 0 ? 1 : 0
+      });
+      if (response.data.success) {
+        Toast.show({ type: 'success', text1: 'Berhasil', text2: response.data.message });
+        fetchAllReviews();
+        fetchReviewStats();
+      }
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal mengubah status review' });
+    }
+  };
+
+  const bulkUpdateDisplay = async (display: boolean) => {
+    if (selectedReviews.size === 0) {
+      Toast.show({ type: 'info', text1: 'Info', text2: 'Pilih minimal satu review' });
+      return;
+    }
+
+    setLoadingReviews(true);
+    try {
+      const response = await api.post("/reviews/admin/bulk-toggle", {
+        review_ids: Array.from(selectedReviews),
+        is_displayed: display
+      });
+      if (response.data.success) {
+        Toast.show({ type: 'success', text1: 'Berhasil', text2: response.data.message });
+        setSelectedReviews(new Set());
+        setIsSelectAll(false);
+        fetchAllReviews();
+        fetchReviewStats();
+      }
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal update批量 review' });
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  const toggleSelectReview = (reviewId: number) => {
+    const newSelected = new Set(selectedReviews);
+    if (newSelected.has(reviewId)) {
+      newSelected.delete(reviewId);
+    } else {
+      newSelected.add(reviewId);
+    }
+    setSelectedReviews(newSelected);
+    setIsSelectAll(newSelected.size === reviews.length && reviews.length > 0);
+  };
+
+  const toggleSelectAll = () => {
+    if (isSelectAll) {
+      setSelectedReviews(new Set());
+    } else {
+      const allIds = reviews.map(r => r.review_id);
+      setSelectedReviews(new Set(allIds));
+    }
+    setIsSelectAll(!isSelectAll);
   };
 
   // --- ACTIONS ---
@@ -623,8 +728,6 @@ export default function MyAppsScreen() {
           </View>
         </View>
 
-
-
         {/* 5. VOUCHER */}
         <View className="px-4 mt-8">
           <View className="flex-row justify-between items-center mb-3">
@@ -766,6 +869,154 @@ export default function MyAppsScreen() {
             <Pressable onPress={handleSendBroadcast} disabled={loading} className={`py-4 rounded-xl items-center ${loading ? 'bg-gray-300' : 'bg-[#633594]'}`}>
               <Text className="text-white font-bold">KIRIM SEKARANG</Text>
             </Pressable>
+          </View>
+        </View>
+
+        {/* 8. MANAJEMEN REVIEW */}
+        <View className="px-4 mt-8">
+          <View className="flex-row justify-between items-center mb-3">
+            <View className="flex-row items-center">
+              <MessageCircle size={18} color="#633594" />
+              <Text className="text-lg font-bold ml-2">Manajemen Review</Text>
+            </View>
+            {selectedReviews.size > 0 && (
+              <View className="flex-row gap-2">
+                <Pressable
+                  onPress={() => bulkUpdateDisplay(true)}
+                  className="bg-green-50 px-3 py-1.5 rounded-full flex-row items-center gap-1"
+                >
+                  <Eye size={14} color="#16a34a" />
+                  <Text className="text-[10px] font-bold text-green-600">Tampilkan ({selectedReviews.size})</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => bulkUpdateDisplay(false)}
+                  className="bg-red-50 px-3 py-1.5 rounded-full flex-row items-center gap-1"
+                >
+                  <EyeOff size={14} color="#dc2626" />
+                  <Text className="text-[10px] font-bold text-red-600">Sembunyikan ({selectedReviews.size})</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+
+          {/* Statistik Card */}
+          {reviewStats && (
+            <View className="flex-row gap-3 mb-4">
+              <View className="flex-1 bg-purple-50 rounded-2xl px-4 py-3">
+                <Text className="text-[10px] font-bold text-purple-400 uppercase">Total Review</Text>
+                <Text className="text-xl font-black text-purple-600">{reviewStats.total_reviews || 0}</Text>
+              </View>
+              <View className="flex-1 bg-green-50 rounded-2xl px-4 py-3">
+                <Text className="text-[10px] font-bold text-green-400 uppercase">Ditampilkan</Text>
+                <Text className="text-xl font-black text-green-600">{reviewStats.displayed_reviews || 0}</Text>
+              </View>
+              <View className="flex-1 bg-gray-50 rounded-2xl px-4 py-3">
+                <Text className="text-[10px] font-bold text-gray-400 uppercase">Tersembunyi</Text>
+                <Text className="text-xl font-black text-gray-600">{reviewStats.hidden_reviews || 0}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Tombol Select All */}
+          <Pressable
+            onPress={toggleSelectAll}
+            className="flex-row items-center gap-2 mb-3 px-1"
+          >
+            {isSelectAll ? (
+              <CheckSquare size={18} color="#633594" />
+            ) : (
+              <Square size={18} color="#94a3b8" />
+            )}
+            <Text className="text-xs font-bold text-gray-500">
+              {isSelectAll ? "Batal Pilih Semua" : "Pilih Semua"}
+            </Text>
+          </Pressable>
+
+          {/* Daftar Review */}
+          <View className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            {loadingReviews ? (
+              <View className="p-8 items-center">
+                <ActivityIndicator color="#633594" />
+              </View>
+            ) : reviews.length === 0 ? (
+              <View className="p-8 items-center">
+                <MessageCircle size={40} color="#cbd5e1" />
+                <Text className="text-gray-400 mt-2">Belum ada review</Text>
+              </View>
+            ) : (
+              reviews.map((review) => (
+                <View key={review.review_id} className="p-4 border-b border-gray-50">
+                  <View className="flex-row items-start gap-3">
+                    {/* Checkbox */}
+                    <Pressable onPress={() => toggleSelectReview(review.review_id)}>
+                      {selectedReviews.has(review.review_id) ? (
+                        <CheckSquare size={20} color="#633594" />
+                      ) : (
+                        <Square size={20} color="#94a3b8" />
+                      )}
+                    </Pressable>
+
+                    {/* Content */}
+                    <View className="flex-1">
+                      <View className="flex-row justify-between items-start flex-wrap gap-2">
+                        <View className="flex-1">
+                          <Text className="font-bold text-gray-800">{review.customer_name}</Text>
+                          <Text className="text-[10px] text-gray-400">{review.store_name}</Text>
+                        </View>
+                        <View className={`px-2 py-1 rounded-full ${review.is_displayed ? 'bg-green-50' : 'bg-gray-50'}`}>
+                          <Text className={`text-[9px] font-bold ${review.is_displayed ? 'text-green-600' : 'text-gray-400'}`}>
+                            {review.is_displayed ? 'DITAMPILKAN' : 'TERSEMBUNYI'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Rating Stars */}
+                      <View className="flex-row items-center gap-1 mt-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            size={12}
+                            color={star <= review.rating ? "#fbbf24" : "#e2e8f0"}
+                            fill={star <= review.rating ? "#fbbf24" : "transparent"}
+                          />
+                        ))}
+                        <Text className="text-[10px] text-gray-400 ml-1">
+                          {review.rating_quality && `Kualitas: ${review.rating_quality} • `}
+                          {review.rating_punctuality && `Tepat waktu: ${review.rating_punctuality}`}
+                        </Text>
+                      </View>
+
+                      {/* Comment */}
+                      {review.comment && (
+                        <Text className="text-xs text-gray-600 mt-2" numberOfLines={2}>
+                          "{review.comment}"
+                        </Text>
+                      )}
+
+                      {/* Tombol Aksi */}
+                      <View className="flex-row gap-2 mt-3">
+                        <Pressable
+                          onPress={() => toggleReviewDisplay(review.review_id, review.is_displayed)}
+                          className={`flex-1 py-1.5 rounded-lg flex-row items-center justify-center gap-1 ${review.is_displayed ? 'bg-gray-100' : 'bg-green-50'}`}
+                        >
+                          {review.is_displayed ? (
+                            <>
+                              <EyeOff size={12} color="#6b7280" />
+                              <Text className="text-[10px] font-bold text-gray-600">Sembunyikan</Text>
+                            </>
+                          ) : (
+                            <>
+                              <Eye size={12} color="#16a34a" />
+                              <Text className="text-[10px] font-bold text-green-600">Tampilkan</Text>
+                            </>
+                          )}
+                        </Pressable>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ))
+            )}
           </View>
         </View>
 
