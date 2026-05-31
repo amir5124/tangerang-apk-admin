@@ -1,3 +1,4 @@
+import { withAccess } from "@/src/components/withAccess";
 import * as FileSystem from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import {
@@ -20,6 +21,7 @@ import {
 import Toast from "react-native-toast-message";
 import api from "../../src/utils/api";
 
+
 // --- HELPERS ---
 const getBase64 = async (uri: string): Promise<string> => {
   if (Platform.OS === "web") {
@@ -36,10 +38,11 @@ const getBase64 = async (uri: string): Promise<string> => {
   }
 };
 
-export default function MyAppsScreen() {
+function MyAppsScreen() {
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+
 
   // States: Modal Visibility
   const [modalDelete, setModalDelete] = useState<{ visible: boolean; id: number | null; name: string }>({ visible: false, id: null, name: "" });
@@ -124,6 +127,8 @@ export default function MyAppsScreen() {
     fetchAllReviews();
     fetchReviewStats();
   }, []);
+
+
 
   const initData = async () => {
     setLoading(true);
@@ -217,7 +222,7 @@ export default function MyAppsScreen() {
         fetchReviewStats();
       }
     } catch (error) {
-      Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal update批量 review' });
+      Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal update review' });
     } finally {
       setLoadingReviews(false);
     }
@@ -320,30 +325,34 @@ export default function MyAppsScreen() {
   };
 
   const deleteVoucherImage = async (voucherId: number) => {
-    Alert.alert(
-      "Hapus Gambar",
-      "Apakah Anda yakin ingin menghapus gambar voucher ini?",
-      [
-        { text: "Batal", style: "cancel" },
-        {
-          text: "Hapus",
-          style: "destructive",
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await api.delete(`/voucher/image/${voucherId}`);
-              setFormImageUrl("");
-              Toast.show({ type: 'success', text1: 'Berhasil', text2: 'Gambar voucher dihapus' });
-              fetchVouchers();
-            } catch (error) {
-              Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal menghapus gambar' });
-            } finally {
-              setLoading(false);
-            }
-          }
-        }
-      ]
-    );
+    const performDeleteImage = async () => {
+      setLoading(true);
+      try {
+        await api.delete(`/voucher/image/${voucherId}`);
+        setFormImageUrl("");
+        Toast.show({ type: 'success', text1: 'Berhasil', text2: 'Gambar voucher dihapus' });
+        fetchVouchers();
+      } catch (error) {
+        Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal menghapus gambar' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm("Apakah Anda yakin ingin menghapus gambar voucher ini?")) {
+        await performDeleteImage();
+      }
+    } else {
+      Alert.alert(
+        "Hapus Gambar",
+        "Apakah Anda yakin ingin menghapus gambar voucher ini?",
+        [
+          { text: "Batal", style: "cancel" },
+          { text: "Hapus", style: "destructive", onPress: performDeleteImage }
+        ]
+      );
+    }
   };
 
   // =============================================
@@ -571,29 +580,34 @@ export default function MyAppsScreen() {
   };
 
   const handleDeleteVoucher = async (id: number) => {
-    Alert.alert(
-      "Hapus Voucher",
-      "Apakah Anda yakin ingin menghapus voucher ini?",
-      [
-        { text: "Batal", style: "cancel" },
-        {
-          text: "Hapus",
-          style: "destructive",
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await api.delete("/voucher/bulk", { data: { ids: [id] } });
-              Toast.show({ type: 'success', text1: 'Berhasil', text2: 'Voucher dihapus' });
-              fetchVouchers();
-            } catch (e) {
-              Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal menghapus voucher' });
-            } finally {
-              setLoading(false);
-            }
-          }
-        }
-      ]
-    );
+    const performDelete = async () => {
+      setLoading(true);
+      try {
+        await api.delete("/voucher/bulk", { data: { ids: [id] } });
+        Toast.show({ type: 'success', text1: 'Berhasil', text2: 'Voucher dihapus' });
+        fetchVouchers();
+      } catch (e) {
+        Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal menghapus voucher' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Web: gunakan confirm, Mobile: gunakan Alert
+    if (Platform.OS === 'web') {
+      if (window.confirm("Apakah Anda yakin ingin menghapus voucher ini?")) {
+        await performDelete();
+      }
+    } else {
+      Alert.alert(
+        "Hapus Voucher",
+        "Apakah Anda yakin ingin menghapus voucher ini?",
+        [
+          { text: "Batal", style: "cancel" },
+          { text: "Hapus", style: "destructive", onPress: performDelete }
+        ]
+      );
+    }
   };
 
   const handleToggleVoucher = async (id: number, currentStatus: number) => {
@@ -771,20 +785,16 @@ export default function MyAppsScreen() {
                       <Pressable onPress={() => handleDeleteVoucher(v.id)} className="ml-2 p-1.5 bg-red-50 rounded-full">
                         <Trash2 size={12} color="#ef4444" />
                       </Pressable>
-                      {v.image_url && (
-                        <Pressable onPress={() => deleteVoucherImage(v.id)} className="ml-2 p-1.5 bg-orange-50 rounded-full">
-                          <X size={12} color="#f97316" />
-                        </Pressable>
-                      )}
+
                     </View>
                     <Text className="text-[11px] text-gray-500 mt-0.5">
-                      Disc {v.discount_percent}% • Min. Rp{parseInt(v.min_purchase || 0).toLocaleString('id-ID')}
+                      Disc {v.discount_percent}% Min Rp{parseInt(v.min_purchase || 0).toLocaleString('id-ID')}
                     </Text>
-                    {v.description && (
+                    {v.description ? (
                       <Text className="text-[10px] text-gray-400 mt-1" numberOfLines={1}>
                         {v.description}
                       </Text>
-                    )}
+                    ) : null}
                   </View>
                   <Switch
                     value={v.is_active === 1}
@@ -792,7 +802,7 @@ export default function MyAppsScreen() {
                     trackColor={{ true: '#633594', false: '#cbd5e1' }}
                   />
                 </View>
-                {v.image_url && (
+                {v.image_url ? (
                   <View className="mt-2">
                     <Image
                       source={{ uri: `https://backend.tangerangfast.online${v.image_url}` }}
@@ -800,15 +810,15 @@ export default function MyAppsScreen() {
                       resizeMode="cover"
                     />
                   </View>
-                )}
+                ) : null}
               </View>
             ))}
-            {vouchers.length === 0 && (
+            {vouchers.length === 0 ? (
               <View className="p-8 items-center">
                 <Ticket size={40} color="#cbd5e1" />
                 <Text className="text-gray-400 mt-2">Belum ada voucher</Text>
               </View>
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -879,7 +889,7 @@ export default function MyAppsScreen() {
               <MessageCircle size={18} color="#633594" />
               <Text className="text-lg font-bold ml-2">Manajemen Review</Text>
             </View>
-            {selectedReviews.size > 0 && (
+            {selectedReviews.size > 0 ? (
               <View className="flex-row gap-2">
                 <Pressable
                   onPress={() => bulkUpdateDisplay(true)}
@@ -896,11 +906,11 @@ export default function MyAppsScreen() {
                   <Text className="text-[10px] font-bold text-red-600">Sembunyikan ({selectedReviews.size})</Text>
                 </Pressable>
               </View>
-            )}
+            ) : null}
           </View>
 
           {/* Statistik Card */}
-          {reviewStats && (
+          {reviewStats ? (
             <View className="flex-row gap-3 mb-4">
               <View className="flex-1 bg-purple-50 rounded-2xl px-4 py-3">
                 <Text className="text-[10px] font-bold text-purple-400 uppercase">Total Review</Text>
@@ -915,7 +925,7 @@ export default function MyAppsScreen() {
                 <Text className="text-xl font-black text-gray-600">{reviewStats.hidden_reviews || 0}</Text>
               </View>
             </View>
-          )}
+          ) : null}
 
           {/* Tombol Select All */}
           <Pressable
@@ -970,7 +980,7 @@ export default function MyAppsScreen() {
                         </View>
                       </View>
 
-                      {/* Rating Stars */}
+                      {/* Bagian Rating Stars - Aman */}
                       <View className="flex-row items-center gap-1 mt-2">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <Star
@@ -981,17 +991,25 @@ export default function MyAppsScreen() {
                           />
                         ))}
                         <Text className="text-[10px] text-gray-400 ml-1">
-                          {review.rating_quality && `Kualitas: ${review.rating_quality} • `}
-                          {review.rating_punctuality && `Tepat waktu: ${review.rating_punctuality}`}
+                          {(() => {
+                            const parts = [];
+                            if (review.rating_quality && review.rating_quality > 0) {
+                              parts.push(`Kualitas: ${review.rating_quality}`);
+                            }
+                            if (review.rating_punctuality && review.rating_punctuality > 0) {
+                              parts.push(`Tepat waktu: ${review.rating_punctuality}`);
+                            }
+                            return parts.join(' - ');
+                          })()}
                         </Text>
                       </View>
 
                       {/* Comment */}
-                      {review.comment && (
+                      {review.comment ? (
                         <Text className="text-xs text-gray-600 mt-2" numberOfLines={2}>
                           "{review.comment}"
                         </Text>
-                      )}
+                      ) : null}
 
                       {/* Tombol Aksi */}
                       <View className="flex-row gap-2 mt-3">
@@ -1055,12 +1073,12 @@ export default function MyAppsScreen() {
                   ) : (
                     <View className="items-center">
                       <ImagePlus size={24} color="#cbd5e1" />
-                      <Text className="text-[10px] text-gray-400 mt-1">Upload Banner (Max 10MB)</Text>
+                      <Text className="text-[10px] text-gray-400 mt-1">Upload Banner Max 10MB</Text>
                     </View>
                   )}
               </Pressable>
 
-              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Kode Voucher *</Text>
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Kode Voucher</Text>
               <TextInput
                 className="bg-gray-50 p-4 rounded-xl mb-4 border border-gray-100 font-bold text-[#633594]"
                 value={formCode}
@@ -1073,14 +1091,14 @@ export default function MyAppsScreen() {
               <TextInput
                 multiline
                 className="bg-gray-50 p-4 rounded-xl mb-4 border border-gray-100"
-                placeholder="Jelaskan detail promo..."
+                placeholder="Jelaskan detail promo"
                 value={formDescription}
                 onChangeText={setFormDescription}
               />
 
               <View className="flex-row gap-4 mb-4">
                 <View className="flex-1">
-                  <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Diskon (%) *</Text>
+                  <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Diskon Persen</Text>
                   <TextInput
                     className="bg-gray-50 p-4 rounded-xl border border-gray-100"
                     keyboardType="numeric"
@@ -1090,7 +1108,7 @@ export default function MyAppsScreen() {
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Min. Belanja (Rp)</Text>
+                  <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Min Belanja</Text>
                   <TextInput
                     className="bg-gray-50 p-4 rounded-xl border border-gray-100"
                     keyboardType="numeric"
@@ -1103,7 +1121,7 @@ export default function MyAppsScreen() {
 
               <View className="flex-row gap-4 mb-6">
                 <View className="flex-1">
-                  <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Maks Potongan (Rp)</Text>
+                  <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Maks Potongan</Text>
                   <TextInput
                     className="bg-gray-50 p-4 rounded-xl border border-gray-100"
                     keyboardType="numeric"
@@ -1113,7 +1131,7 @@ export default function MyAppsScreen() {
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Limit / User</Text>
+                  <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Limit per User</Text>
                   <TextInput
                     className="bg-gray-50 p-4 rounded-xl border border-gray-100"
                     keyboardType="numeric"
@@ -1130,7 +1148,7 @@ export default function MyAppsScreen() {
                 disabled={loading || !formCode || !formPercent}
               >
                 <Text className="text-white font-bold text-lg">
-                  {loading ? "Menyimpan..." : selectedVoucher ? "Update Voucher" : "Simpan Voucher"}
+                  {loading ? "Menyimpan..." : (selectedVoucher ? "Update Voucher" : "Simpan Voucher")}
                 </Text>
               </Pressable>
             </ScrollView>
@@ -1144,16 +1162,22 @@ export default function MyAppsScreen() {
           <View className="bg-white w-full rounded-3xl p-6 items-center">
             <Trash2 size={40} color="#ef4444" />
             <Text className="text-lg font-bold mt-4">Hapus Layanan?</Text>
-            <Text className="text-gray-500 text-center mt-2 mb-6">Layanan <Text className="font-bold text-gray-800">{modalDelete.name}</Text> akan dihapus permanen.</Text>
+            <Text className="text-gray-500 text-center mt-2 mb-6">
+              Layanan <Text className="font-bold text-gray-800">{modalDelete.name}</Text> akan dihapus permanen.
+            </Text>
             <View className="flex-row gap-3 w-full">
-              <Pressable onPress={() => setModalDelete({ visible: false, id: null, name: "" })} className="flex-1 py-3 bg-gray-100 rounded-xl items-center"><Text className="font-bold text-gray-600">Batal</Text></Pressable>
-              <Pressable onPress={handleDeleteAsset} className="flex-1 py-3 bg-red-500 rounded-xl items-center"><Text className="font-bold text-white">Ya, Hapus</Text></Pressable>
+              <Pressable onPress={() => setModalDelete({ visible: false, id: null, name: "" })} className="flex-1 py-3 bg-gray-100 rounded-xl items-center">
+                <Text className="font-bold text-gray-600">Batal</Text>
+              </Pressable>
+              <Pressable onPress={handleDeleteAsset} className="flex-1 py-3 bg-red-500 rounded-xl items-center">
+                <Text className="font-bold text-white">Ya Hapus</Text>
+              </Pressable>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Modal Edit Nama Service - Dengan Upload Gambar */}
+      {/* Modal Edit Nama Service */}
       <Modal visible={editNameModal} transparent animationType="fade">
         <View className="flex-1 justify-center items-center bg-black/50 px-8">
           <View className="bg-white w-full rounded-3xl p-6 max-h-[80%]">
@@ -1217,9 +1241,7 @@ export default function MyAppsScreen() {
         </View>
       </Modal>
 
-      {/* ============================================================= */}
-      {/* Modal Tambah Layanan — UPDATED dengan upload gambar            */}
-      {/* ============================================================= */}
+      {/* Modal Tambah Layanan */}
       <Modal visible={addServiceModal} transparent animationType="slide">
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-[30px] p-6 pb-10">
@@ -1239,7 +1261,6 @@ export default function MyAppsScreen() {
                 </Pressable>
               </View>
 
-              {/* Upload Gambar */}
               <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Gambar Icon Layanan</Text>
               <Pressable
                 onPress={pickNewServiceImage}
@@ -1259,11 +1280,11 @@ export default function MyAppsScreen() {
                   <View className="items-center">
                     <ImagePlus size={28} color="#cbd5e1" />
                     <Text className="text-[11px] text-gray-400 mt-2 font-semibold">Tap untuk pilih gambar</Text>
-                    <Text className="text-[9px] text-gray-300 mt-0.5">PNG, JPG • Maks 5MB</Text>
+                    <Text className="text-[9px] text-gray-300 mt-0.5">PNG JPG Maks 5MB</Text>
                   </View>
                 )}
               </Pressable>
-              {newServiceImageUri && (
+              {newServiceImageUri ? (
                 <Pressable
                   onPress={() => { setNewServiceImageUri(null); setNewServiceImageBase64(null); }}
                   className="flex-row items-center justify-center mb-4 -mt-2"
@@ -1271,21 +1292,19 @@ export default function MyAppsScreen() {
                   <X size={12} color="#ef4444" />
                   <Text className="text-[10px] text-red-400 ml-1 font-bold">Hapus gambar</Text>
                 </Pressable>
-              )}
+              ) : null}
 
-              {/* Nama Layanan */}
-              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Nama Layanan *</Text>
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Nama Layanan</Text>
               <TextInput
-                placeholder="Contoh: Cuci AC"
+                placeholder="Contoh Cuci AC"
                 className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4"
                 value={newService.name}
                 onChangeText={t => setNewService(p => ({ ...p, name: t }))}
               />
 
-              {/* Kode Unik */}
-              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Kode Unik *</Text>
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Kode Unik</Text>
               <TextInput
-                placeholder="Contoh: pijat"
+                placeholder="Contoh pijat"
                 autoCapitalize="none"
                 className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6"
                 value={newService.key}
@@ -1315,9 +1334,7 @@ export default function MyAppsScreen() {
         </View>
       </Modal>
 
-      {/* ============================================================= */}
-      {/* Modal Tambah Menu Lainnya — UPDATED dengan upload gambar       */}
-      {/* ============================================================= */}
+      {/* Modal Tambah Menu Lainnya */}
       <Modal visible={addOtherServiceModal} transparent animationType="slide">
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-[30px] p-6 pb-10">
@@ -1337,7 +1354,6 @@ export default function MyAppsScreen() {
                 </Pressable>
               </View>
 
-              {/* Upload Gambar */}
               <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Gambar Icon Menu</Text>
               <Pressable
                 onPress={pickNewOtherImage}
@@ -1357,11 +1373,11 @@ export default function MyAppsScreen() {
                   <View className="items-center">
                     <ImagePlus size={28} color="#cbd5e1" />
                     <Text className="text-[11px] text-gray-400 mt-2 font-semibold">Tap untuk pilih gambar</Text>
-                    <Text className="text-[9px] text-gray-300 mt-0.5">PNG, JPG • Maks 5MB</Text>
+                    <Text className="text-[9px] text-gray-300 mt-0.5">PNG JPG Maks 5MB</Text>
                   </View>
                 )}
               </Pressable>
-              {newOtherImageUri && (
+              {newOtherImageUri ? (
                 <Pressable
                   onPress={() => { setNewOtherImageUri(null); setNewOtherImageBase64(null); }}
                   className="flex-row items-center justify-center mb-4 -mt-2"
@@ -1369,21 +1385,19 @@ export default function MyAppsScreen() {
                   <X size={12} color="#ef4444" />
                   <Text className="text-[10px] text-red-400 ml-1 font-bold">Hapus gambar</Text>
                 </Pressable>
-              )}
+              ) : null}
 
-              {/* Nama Menu */}
-              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Nama Menu *</Text>
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Nama Menu</Text>
               <TextInput
-                placeholder="Contoh: Laundry"
+                placeholder="Contoh Laundry"
                 className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-4"
                 value={newService.name}
                 onChangeText={t => setNewService(p => ({ ...p, name: t }))}
               />
 
-              {/* Kode Unik */}
-              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Kode Unik *</Text>
+              <Text className="text-gray-500 text-[10px] mb-1 ml-1 font-bold uppercase">Kode Unik</Text>
               <TextInput
-                placeholder="Contoh: laundry"
+                placeholder="Contoh laundry"
                 autoCapitalize="none"
                 className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6"
                 value={newService.key}
@@ -1413,7 +1427,7 @@ export default function MyAppsScreen() {
         </View>
       </Modal>
 
-      {/* Modal Edit Menu Lainnya - Dengan Upload Gambar */}
+      {/* Modal Edit Menu Lainnya */}
       <Modal visible={editOtherModal} transparent animationType="fade">
         <View className="flex-1 justify-center items-center bg-black/50 px-8">
           <View className="bg-white w-full rounded-3xl p-6 max-h-[80%]">
@@ -1466,13 +1480,15 @@ export default function MyAppsScreen() {
       </Modal>
 
       {/* Global Loading Overlay */}
-      {loading && (
+      {loading ? (
         <View className="absolute inset-0 bg-white/40 justify-center items-center z-[99]">
           <ActivityIndicator size="large" color="#633594" />
         </View>
-      )}
+      ) : null}
 
       <Toast />
     </View>
   );
 }
+
+export default withAccess("myapps", MyAppsScreen);

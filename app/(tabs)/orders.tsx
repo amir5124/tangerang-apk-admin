@@ -1,3 +1,4 @@
+import { withAccess } from "@/src/components/withAccess";
 import { useFocusEffect, useRouter } from "expo-router";
 import { AlertCircle, ChevronRight, CreditCard, Info, Search } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
@@ -5,7 +6,7 @@ import { ActivityIndicator, FlatList, Pressable, ScrollView, StatusBar, Text, Te
 import { orderService } from "../../src/services/orderService";
 import { Order } from "../../src/types/order";
 
-export default function HomeScreen() {
+function HomeScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -161,3 +162,5 @@ export default function HomeScreen() {
     </View>
   );
 }
+
+export default withAccess("orders", HomeScreen);

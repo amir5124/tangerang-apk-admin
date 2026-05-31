@@ -18,6 +18,7 @@ import {
   TouchableOpacity, View
 } from "react-native";
 import * as XLSX from "xlsx"; // Pastikan sudah install: npm install xlsx
+import { withAccess } from "../../src/components/withAccess";
 import { orderService } from "../../src/services/orderService";
 import { Order } from "../../src/types/order";
 
@@ -29,7 +30,8 @@ const formatRupiah = (number: number) => {
   }).format(number);
 };
 
-export default function DashboardScreen() {
+function DashboardScreen() {
+
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -456,16 +458,16 @@ export default function DashboardScreen() {
                     {formatRupiah(parseFloat(item.total_price))}
                   </Text>
                   <View className={`px-2 py-0.5 rounded-md mt-1 ${item.status === "accepted" ? "bg-blue-100" :
-                      item.status === "on_the_way" ? "bg-purple-100" :
-                        item.status === "working" ? "bg-orange-100" :
-                          item.status === "completed" ? "bg-green-100" :
-                            item.status === "cancelled" ? "bg-red-100" : "bg-gray-100"
+                    item.status === "on_the_way" ? "bg-purple-100" :
+                      item.status === "working" ? "bg-orange-100" :
+                        item.status === "completed" ? "bg-green-100" :
+                          item.status === "cancelled" ? "bg-red-100" : "bg-gray-100"
                     }`}>
                     <Text className={`text-[8px] font-bold uppercase ${item.status === "accepted" ? "text-blue-700" :
-                        item.status === "on_the_way" ? "text-purple-700" :
-                          item.status === "working" ? "text-orange-700" :
-                            item.status === "completed" ? "text-green-700" :
-                              item.status === "cancelled" ? "text-red-700" : "text-gray-700"
+                      item.status === "on_the_way" ? "text-purple-700" :
+                        item.status === "working" ? "text-orange-700" :
+                          item.status === "completed" ? "text-green-700" :
+                            item.status === "cancelled" ? "text-red-700" : "text-gray-700"
                       }`}>
                       {
                         item.status === "accepted" ? "DITERIMA" :
@@ -487,3 +489,5 @@ export default function DashboardScreen() {
     </View>
   );
 }
+
+export default withAccess("index", DashboardScreen);

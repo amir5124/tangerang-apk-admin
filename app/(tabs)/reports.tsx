@@ -1,8 +1,9 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useFocusEffect } from "expo-router";
-import { ArrowDownCircle, Calendar, ChevronLeft, ChevronRight, Clock, RefreshCcw, Search, TrendingUp } from "lucide-react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { ArrowDownCircle, Calendar, ChevronLeft, ChevronRight, Clock, Landmark, RefreshCcw, Search, TrendingUp } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { withAccess } from "../../src/components/withAccess";
 import { orderService } from "../../src/services/orderService";
 import { Order } from "../../src/types/order";
 import API from "../../src/utils/api";
@@ -35,7 +36,8 @@ const formatRupiah = (number: any) => {
   }).format(val || 0);
 };
 
-export default function ReportsScreen() {
+function ReportsScreen() {
+  const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [withdraws, setWithdraws] = useState<any[]>([]);
   const [refunds, setRefunds] = useState<any[]>([]);
@@ -223,9 +225,23 @@ export default function ReportsScreen() {
   return (
     <View className="flex-1 bg-white">
       <View className="px-4">
-        <View className="bg-white pt-12 pb-6 mb-4">
-          <Text className="text-2xl font-bold text-gray-800">Kelola Laporan</Text>
-          <Text className="text-gray-400 text-sm">Kelola laporan transaksi</Text>
+        <View className="bg-white pt-12 pb-6 mb-4 px-5">
+          <View className="flex-row justify-between items-center">
+            <View>
+              <Text className="text-2xl font-bold text-gray-800">Kelola Laporan</Text>
+              <Text className="text-gray-400 text-sm">Kelola laporan transaksi</Text>
+            </View>
+
+            {/* Tombol Tarik Saldo */}
+            <TouchableOpacity
+              onPress={() => router.push("/withdraw")}
+              className="bg-[#633594] flex-row items-center gap-2 px-4 py-2.5 rounded-xl active:opacity-80 shadow-sm"
+              activeOpacity={0.8}
+            >
+              <Landmark size={18} color="#fff" />
+              <Text className="text-white font-bold text-sm">Tarik Saldo</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Search Bar */}
@@ -416,3 +432,5 @@ function DetailRow({ label, value, isBold }: { label: string; value: string; isB
     </View>
   );
 }
+
+export default withAccess("reports", ReportsScreen);

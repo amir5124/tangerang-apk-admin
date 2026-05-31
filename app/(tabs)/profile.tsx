@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { AlertTriangle, Ban, Download, LogOut, Phone, RefreshCw, Search, Store, UserCheck, Users, XCircle } from "lucide-react-native";
+import { AlertTriangle, Ban, Download, LogOut, Phone, RefreshCw, Search, Store, Trash2, TrendingUp, UserCheck, Users, XCircle } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator, Alert, FlatList, Modal, Platform,
@@ -88,6 +88,11 @@ export default function AdminUserList() {
   const [suspendMitra, setSuspendMitra] = useState<any>(null);
   const [suspendReason, setSuspendReason] = useState("");
   const [isSuspending, setIsSuspending] = useState(false);
+
+  // NEW: State untuk modal Hapus Mitra
+  const [deleteModal, setDeleteModal] = useState(false);
+  const [deleteMitraData, setDeleteMitraData] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -243,6 +248,61 @@ export default function AdminUserList() {
     setSuspendMitra(item);
     setSuspendReason("");
     setSuspendModal(true);
+  };
+
+  // =============================================
+  // NEW: FUNGSI HAPUS MITRA
+  // =============================================
+  const handleDeleteMitra = (item: any) => {
+    setDeleteMitraData(item);
+    setDeleteModal(true);
+  };
+
+  const executeDeleteMitra = async () => {
+    if (!deleteMitraData) return;
+
+    const storeId = getStoreId(deleteMitraData);
+    const hasStoreData = hasStore(deleteMitraData);
+
+    setIsDeleting(true);
+
+    try {
+      let response;
+
+      if (!hasStoreData) {
+        // Jika mitra belum punya store, hapus user
+        response = await api.delete(`/mitra/user/${deleteMitraData.id}`);
+      } else {
+        // Jika mitra sudah punya store, hapus store beserta data terkait
+        if (!storeId) {
+          Toast.show({ type: "error", text1: "Error", text2: "ID Toko tidak ditemukan" });
+          return;
+        }
+        response = await api.delete(`/mitra/${storeId}`);
+      }
+
+      if (response.data.success) {
+        Toast.show({
+          type: "success",
+          text1: "Berhasil",
+          text2: response.data.message || `Mitra ${deleteMitraData.full_name || deleteMitraData.store_name} berhasil dihapus`
+        });
+        fetchUsers();
+        setDeleteModal(false);
+        setDeleteMitraData(null);
+      } else {
+        Toast.show({ type: "error", text1: "Gagal", text2: response.data.message || "Gagal menghapus mitra" });
+      }
+    } catch (error: any) {
+      console.error("Delete mitra error:", error);
+      Toast.show({
+        type: "error",
+        text1: "Gagal",
+        text2: error.response?.data?.message || "Terjadi kesalahan saat menghapus mitra"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const executeRevertToPending = async () => {
@@ -488,6 +548,26 @@ export default function AdminUserList() {
             )}
           </View>
 
+          {/* TOMBOL LIHAT PERFORMA */}
+          <View className="mb-3">
+            <Pressable
+              onPress={() => {
+                router.push({
+                  pathname: "/mitra-performance",
+                  params: {
+                    mitraId: item.id,
+                    mitraName: item.store_name || item.full_name,
+                    mitraEmail: item.email
+                  }
+                });
+              }}
+              className="bg-[#633594]/10 py-2.5 rounded-xl flex-row items-center justify-center gap-2 border border-[#633594]/20"
+            >
+              <TrendingUp size={16} color="#633594" />
+              <Text className="text-xs font-bold text-[#633594]">LIHAT PERFORMA</Text>
+            </Pressable>
+          </View>
+
           <View className="flex-row flex-wrap gap-2">
             {(item.store_status === "pending" || item.store_status === "pending_registration" || !item.store_status) && (
               <Pressable onPress={() => handleApproveMitra(item)} className="flex-1 bg-green-50 py-2.5 rounded-xl flex-row items-center justify-center gap-2">
@@ -502,6 +582,12 @@ export default function AdminUserList() {
                 <Text className="text-xs font-bold text-red-600">TOLAK</Text>
               </Pressable>
             )}
+
+            {/* TOMBOL HAPUS - Untuk semua mitra */}
+            <Pressable onPress={() => handleDeleteMitra(item)} className="flex-1 bg-red-50 py-2.5 rounded-xl flex-row items-center justify-center gap-2">
+              <Trash2 size={16} color="#dc2626" />
+              <Text className="text-xs font-bold text-red-600">HAPUS</Text>
+            </Pressable>
 
             {/* TOMBOL SUSPEND - Untuk mitra yang sudah approved */}
             {item.store_status === "approved" && (
@@ -554,7 +640,7 @@ export default function AdminUserList() {
           </View>
         </View>
 
-        {/* ── Stats Cards ── */}
+        {/* Stats Cards */}
         <View className="flex-row gap-3 mb-4">
           <View className="flex-1 bg-blue-50 rounded-2xl px-4 py-3 flex-row items-center gap-3">
             <View className="w-9 h-9 rounded-full bg-blue-100 justify-center items-center">
@@ -590,9 +676,15 @@ export default function AdminUserList() {
         ))}
       </View>
 
-      <FlatList data={filteredUsers} renderItem={renderUserItem} keyExtractor={(item) => item.id.toString()} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchUsers} />} contentContainerStyle={{ paddingBottom: 20 }} />
+      <FlatList
+        data={filteredUsers}
+        renderItem={renderUserItem}
+        keyExtractor={(item) => item.id.toString()}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchUsers} />}
+        contentContainerStyle={{ paddingBottom: 20 }}
+      />
 
-      {/* ── Modal Tolak Pendaftaran (pakai Modal, bukan Alert/prompt) ── */}
+      {/* Modal Tolak Pendaftaran */}
       <Modal visible={rejectModal} transparent animationType="fade">
         <View className="flex-1 justify-center items-center bg-black/60 px-8">
           <View className="bg-white w-full rounded-3xl p-6">
@@ -638,7 +730,54 @@ export default function AdminUserList() {
         </View>
       </Modal>
 
-      {/* NEW: Modal Suspend Mitra */}
+      {/* NEW: Modal Hapus Mitra */}
+      <Modal visible={deleteModal} transparent animationType="fade">
+        <View className="flex-1 justify-center items-center bg-black/60 px-8">
+          <View className="bg-white w-full rounded-3xl p-6">
+            <View className="flex-row items-center gap-2 mb-2">
+              <Trash2 size={24} color="#dc2626" />
+              <Text className="text-lg font-bold text-gray-800">Hapus Mitra</Text>
+            </View>
+            <Text className="text-sm text-gray-400 mb-5">
+              Apakah Anda yakin ingin menghapus mitra <Text className="font-bold text-gray-800">{deleteMitraData?.full_name || deleteMitraData?.store_name || "-"}</Text>?
+            </Text>
+
+            <View className="bg-red-50 rounded-xl p-4 mb-5">
+              <Text className="text-sm text-red-700 text-center font-bold">⚠️ PERINGATAN</Text>
+              <Text className="text-xs text-red-600 text-center mt-2">
+                Semua data terkait mitra ini akan dihapus secara permanen, termasuk:
+              </Text>
+              <View className="mt-2">
+                <Text className="text-xs text-red-600">• Order dan item pesanan</Text>
+                <Text className="text-xs text-red-600">• Review dan rating</Text>
+                <Text className="text-xs text-red-600">• Layanan yang ditawarkan</Text>
+                <Text className="text-xs text-red-600">• Data toko</Text>
+                <Text className="text-xs text-red-600 font-bold">• Tindakan ini TIDAK DAPAT DIBATALKAN!</Text>
+              </View>
+            </View>
+
+            <View className="flex-row gap-3">
+              <Pressable
+                onPress={() => { setDeleteModal(false); setDeleteMitraData(null); }}
+                disabled={isDeleting}
+                className="flex-1 py-3 bg-gray-100 rounded-xl items-center"
+              >
+                <Text className="font-bold text-gray-600">Batal</Text>
+              </Pressable>
+              <Pressable
+                onPress={executeDeleteMitra}
+                disabled={isDeleting}
+                className={`flex-1 py-3 rounded-xl items-center flex-row justify-center gap-2 ${isDeleting ? "bg-gray-300" : "bg-red-600"}`}
+              >
+                {isDeleting && <ActivityIndicator size="small" color="#fff" />}
+                <Text className="font-bold text-white">{isDeleting ? "Memproses..." : "Ya, Hapus"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Suspend Mitra */}
       <Modal visible={suspendModal} transparent animationType="fade">
         <View className="flex-1 justify-center items-center bg-black/60 px-8">
           <View className="bg-white w-full rounded-3xl p-6">
