@@ -33,14 +33,18 @@ function HomeScreen() {
 
   const getStatusDetails = (status: string) => {
     switch (status.toLowerCase()) {
-      case "unpaid":
-        return { label: "MENUNGGU", bg: "bg-orange-50", text: "text-orange-600" };
+      case "accepted":
+        return { label: "DITERIMA", bg: "bg-blue-100", text: "text-blue-700" };
+      case "on_the_way":
+        return { label: "DI PERJALANAN", bg: "bg-yellow-100", text: "text-yellow-700" };
+      case "working":
+        return { label: "SEDANG DIKERJAKAN", bg: "bg-orange-100", text: "text-orange-700" };
       case "completed":
-        return { label: "SELESAI", bg: "bg-green-50", text: "text-green-600" };
+        return { label: "SELESAI", bg: "bg-green-100", text: "text-green-700" };
       case "cancelled":
-        return { label: "DIBATALKAN", bg: "bg-red-50", text: "text-red-600" };
+        return { label: "BATAL", bg: "bg-red-100", text: "text-red-700" };
       default:
-        return { label: status.toUpperCase(), bg: "bg-blue-50", text: "text-blue-600" };
+        return { label: "MENUNGGU", bg: "bg-gray-100", text: "text-gray-700" };
     }
   };
 

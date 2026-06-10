@@ -472,7 +472,7 @@ function DashboardScreen() {
                       {
                         item.status === "accepted" ? "DITERIMA" :
                           item.status === "on_the_way" ? "DI PERJALANAN" :
-                            item.status === "working" ? "DIPROSES" :
+                            item.status === "working" ? "SEDANG DIKERJAKAN" :
                               item.status === "completed" ? "SELESAI" :
                                 item.status === "cancelled" ? "BATAL" : (item.status || "-").toUpperCase()
                       }
