@@ -69,9 +69,15 @@ function DashboardScreen() {
       const matchesMitra = selectedMitra ? o.mitra_name === selectedMitra : true;
 
       const matchesStatus = selectedStatus
-        ? (selectedStatus === "success" ? (o.payment_status === "settlement" || o.status === "completed") :
-          selectedStatus === "pending" ? (o.payment_status === "pending") :
-            selectedStatus === "failed" ? (o.payment_status === "expire" || o.payment_status === "cancel" || o.payment_status === "failed") : true)
+        ? selectedStatus === "success"
+          ? o.status === "completed"
+          : selectedStatus === "pending"
+            ? o.status === "accepted" ||
+            o.status === "on_the_way" ||
+            o.status === "working"
+            : selectedStatus === "failed"
+              ? o.status === "cancelled"
+              : true
         : true;
 
       return matchesSearch && matchesMitra && matchesStatus;
