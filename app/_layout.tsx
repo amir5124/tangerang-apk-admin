@@ -118,24 +118,55 @@ function RootLayoutContent() {
   const notificationListener = useRef<Notifications.Subscription | undefined>(undefined);
   const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
 
+  // app/_layout.tsx - handleRedirect function
+
   const handleRedirect = (data: any) => {
     if (!data) return;
 
     console.log("🔔 Redirecting with data:", data);
 
-    // Jika tujuan adalah Tab Profile
+    // 🔥 USER PROFILE
     if (data.type === "NEW_USER" || data.screen === "/(tabs)/profile") {
-      // Gunakan replace untuk berpindah antar tab utama
       router.replace("/(tabs)/profile");
+      return;
     }
-    else if (data.orderId) {
+
+    // 🔥 ART ORDER - Arahkan ke halaman art-order dengan parameter id
+    if (data.type === "ADMIN_ART_ORDER" ||
+      data.type === "ART_PAYMENT_SUCCESS" ||
+      data.screen === "ArtOrderDetail") {
+
+      const artId = data.pesanan_id || data.orderId;
+      console.log("🔔 ART Order notification clicked, artId:", artId);
+
+      // 🔥 Arahkan ke halaman art-order dengan parameter id
+      // Halaman art-order akan mendeteksi params.id dan membuka modal detail
+      router.push({
+        pathname: "/(tabs)/art-order",
+        params: {
+          id: artId || '',
+          fromNotification: 'true'
+        }
+      });
+      return;
+    }
+
+    // 🔥 ORDER UMUM (Non-ART)
+    if (data.orderId) {
       router.push(`/order/${data.orderId}`);
+      return;
     }
-    else if (data.screen) {
-      // Pastikan path screen diawali dengan /
+
+    // 🔥 SCREEN LAIN (fallback)
+    if (data.screen) {
       const target = data.screen.startsWith('/') ? data.screen : `/${data.screen}`;
       router.push(target);
+      return;
     }
+
+    // 🔥 FALLBACK: jika tidak ada yang cocok, arahkan ke home
+    console.log("🔔 No matching route, redirecting to home");
+    router.replace("/");
   };
 
   useEffect(() => {
@@ -188,6 +219,13 @@ function RootLayoutContent() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" options={{ animation: "fade_from_bottom" }} />
           <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
+          <Stack.Screen
+            name="art/order/[id]"
+            options={{
+              headerShown: false,
+              presentation: 'card'
+            }}
+          />
           {/* Pastikan file ini ada: app/order/[id].tsx */}
           <Stack.Screen name="order/[id]" options={{ animation: "slide_from_right" }} />
         </Stack>

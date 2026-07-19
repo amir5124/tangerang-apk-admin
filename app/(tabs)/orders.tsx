@@ -1,6 +1,6 @@
 import { withAccess } from "@/src/components/withAccess";
 import { useFocusEffect, useRouter } from "expo-router";
-import { AlertCircle, ChevronRight, CreditCard, Info, Search } from "lucide-react-native";
+import { AlertCircle, ChevronRight, CreditCard, Info, Package, Search, Wrench } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { orderService } from "../../src/services/orderService";
@@ -11,6 +11,8 @@ function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
+  // ✅ Filter tambahan berdasarkan tipe pesanan: semua / jasa / produk
+  const [typeFilter, setTypeFilter] = useState<"all" | "service" | "product">("all");
   const router = useRouter();
 
   const loadAllOrders = async () => {
@@ -52,9 +54,10 @@ function HomeScreen() {
     return orders.filter((o) => {
       const matchesSearch = o.customer_name.toLowerCase().includes(search.toLowerCase()) || o.id.toString().includes(search);
       const matchesFilter = filter === "all" ? true : o.status === filter;
-      return matchesSearch && matchesFilter;
+      const matchesType = typeFilter === "all" ? true : o.order_type === typeFilter;
+      return matchesSearch && matchesFilter && matchesType;
     });
-  }, [orders, search, filter]);
+  }, [orders, search, filter, typeFilter]);
 
   if (loading)
     return (
@@ -65,14 +68,21 @@ function HomeScreen() {
 
   const renderItem = ({ item }: { item: Order }) => {
     const statusInfo = getStatusDetails(item.status);
+    const isProduct = item.order_type === "product";
 
-    // LOGIKA TOTAL PEMBAYARAN: price + platform + service
+    // LOGIKA TOTAL PEMBAYARAN: price + platform + service (+ ongkir & biaya transaksi khusus produk)
     const rawPrice = parseFloat(item.total_price || "0");
     const pFee = parseFloat(item.platform_fee || "0");
     const sFee = parseFloat(item.service_fee || "0");
-    const grandTotal = rawPrice + pFee + sFee;
+    const shipFee = parseFloat(item.shipping_fee || "0");
+    const transFee = parseFloat(item.transaction_fee || "0");
+    const grandTotal = rawPrice + pFee + sFee + shipFee + transFee;
 
     const cancelSource = item.cancelled_by === "customer" ? "Pelanggan" : item.cancelled_by === "mitra" ? "Mitra" : "Sistem";
+
+    // ✅ Nama pihak pelaksana: Mitra untuk jasa, Toko untuk produk
+    const partnerName = isProduct ? item.store_name || "Toko" : item.mitra_name || "Menunggu Mitra";
+    const partnerLabel = isProduct ? "Toko" : "Mitra";
 
     return (
       <View className="bg-white p-5 mx-4 rounded-[24px] mt-4 border border-gray-100">
@@ -81,6 +91,13 @@ function HomeScreen() {
             <View className="bg-gray-100 px-2 py-1 rounded-md">
               <Text className="text-gray-500 text-[10px] font-bold">#ID-{item.id}</Text>
             </View>
+            {/* ✅ Badge tipe pesanan */}
+            <View className={`ml-2 px-2 py-1 rounded-md flex-row items-center ${isProduct ? "bg-blue-50" : "bg-purple-50"}`}>
+              {isProduct ? <Package size={10} color="#2563EB" /> : <Wrench size={10} color="#633594" />}
+              <Text className={`ml-1 text-[9px] font-black uppercase ${isProduct ? "text-blue-600" : "text-[#633594]"}`}>
+                {isProduct ? "Produk" : "Jasa"}
+              </Text>
+            </View>
           </View>
           <View className={`px-3 py-1 rounded-full ${statusInfo.bg}`}>
             <Text className={`text-[9px] font-black ${statusInfo.text}`}>{statusInfo.label}</Text>
@@ -88,14 +105,15 @@ function HomeScreen() {
         </View>
 
         <View className="flex-row items-center">
-          <View className="w-12 h-12 rounded-2xl bg-purple-50 items-center justify-center">
-            <CreditCard size={20} color="#633594" />
+          <View className={`w-12 h-12 rounded-2xl items-center justify-center ${isProduct ? "bg-blue-50" : "bg-purple-50"}`}>
+            {isProduct ? <Package size={20} color="#2563EB" /> : <CreditCard size={20} color="#633594" />}
           </View>
           <View className="flex-1 ml-3">
             <Text className="font-bold text-gray-900 text-sm" numberOfLines={1}>
-              {item.mitra_name}
+              {partnerName}
             </Text>
-            <Text className="text-gray-400 text-[10px] font-medium">
+            <Text className="text-gray-400 text-[9px] font-bold uppercase">{partnerLabel}</Text>
+            <Text className="text-gray-400 text-[10px] font-medium mt-0.5">
               {item.scheduled_date} • {item.scheduled_time?.substring(0, 5)}
             </Text>
             <Text className="text-gray-600 text-[11px] mt-1">Cust: {item.customer_name}</Text>
@@ -138,6 +156,28 @@ function HomeScreen() {
           <TextInput className="ml-3 flex-1 text-sm text-gray-700" placeholder="Cari transaksi..." value={search} onChangeText={setSearch} />
         </View>
 
+        {/* ✅ Filter Tipe: Semua / Jasa / Produk */}
+        <View className="flex-row mb-3">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {[
+              { value: "all", label: "Semua Tipe" },
+              { value: "service", label: "Jasa" },
+              { value: "product", label: "Produk" },
+            ].map((t) => (
+              <Pressable
+                key={t.value}
+                onPress={() => setTypeFilter(t.value as "all" | "service" | "product")}
+                className={`px-5 py-2 rounded-full mr-2 flex-row items-center ${typeFilter === t.value ? "bg-gray-900" : "bg-gray-100"}`}
+              >
+                {t.value === "service" && <Wrench size={11} color={typeFilter === t.value ? "#fff" : "#6B7280"} />}
+                {t.value === "product" && <Package size={11} color={typeFilter === t.value ? "#fff" : "#6B7280"} />}
+                <Text className={`text-[11px] font-bold ml-1 ${typeFilter === t.value ? "text-white" : "text-gray-500"}`}>{t.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Filter Status */}
         <View className="flex-row">
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {["all", "unpaid", "completed", "cancelled"].map((f) => (

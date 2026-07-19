@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { AlertCircle, ArrowLeft, Building2, Calendar, Clock, FileText, Info, MapPin, User, Wrench } from "lucide-react-native";
+import { AlertCircle, ArrowLeft, Building2, Calendar, Clock, CreditCard, FileText, Info, MapPin, Package, Truck, User, Wrench } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from "react-native";
 import { orderService } from "../../src/services/orderService";
@@ -76,10 +76,13 @@ export default function DetailOrderScreen() {
   const statusInfo = getStatusDetails(order.status);
   const services = typeof order.items === "string" ? JSON.parse(order.items || "[]") : order.items || [];
 
+  // 🔥 Deteksi jenis order
+  const isProductOrder = order.order_type === "product";
+
   return (
     <View className="flex-1 bg-[#F5F7FA]">
       {/* HEADER: FIXED TOP */}
-      <View className="absolute top-0 left-0 right-0 z-50 bg-white px-4  pb-4 flex-row items-center justify-between border-b border-gray-100">
+      <View className="absolute top-0 left-0 right-0 z-50 bg-white px-4 pb-4 flex-row items-center justify-between border-b border-gray-100">
         {/* Tombol Back */}
         <View className="z-10">
           <Pressable onPress={() => router.back()} className="p-0 ml-2 pt-4">
@@ -88,9 +91,9 @@ export default function DetailOrderScreen() {
         </View>
 
         {/* Judul Rata Tengah */}
-        <View className="absolute inset-x-0 inset-y-0  flex-row justify-center items-center pointer-events-none">
+        <View className="absolute inset-x-0 inset-y-0 flex-row justify-center items-center pointer-events-none">
           <Text className="text-xl font-bold text-gray-800">Detail Order</Text>
-          <Text className="ml-2 text-xl font-bold text-gray-80">#{order.id}</Text>
+          <Text className="ml-2 text-xl font-bold text-gray-800">#{order.id}</Text>
         </View>
 
         {/* Spacer Kanan agar Flexbox tetap balance */}
@@ -116,7 +119,9 @@ export default function DetailOrderScreen() {
                 <Calendar size={14} color="#633594" />
               </View>
               <View className="ml-3">
-                <Text className="text-gray-400 text-[10px]">Tanggal Pesan</Text>
+                <Text className="text-gray-400 text-[10px]">
+                  {isProductOrder ? "Tanggal Pemesanan" : "Tanggal Pesan"}
+                </Text>
                 <Text className="text-gray-700 font-bold text-xs">{formatOrderDate(order.order_date)}</Text>
               </View>
             </View>
@@ -132,15 +137,19 @@ export default function DetailOrderScreen() {
               </View>
             </View>
 
-            {/* Info Jadwal Kerja */}
+            {/* Info Jadwal - Beda antara Produk dan Layanan */}
             <View className="flex-row items-center">
               <View className="w-8 h-8 rounded-full bg-purple-50 items-center justify-center">
-                <Clock size={14} color="#633594" />
+                {isProductOrder ? <Truck size={14} color="#633594" /> : <Clock size={14} color="#633594" />}
               </View>
               <View className="ml-3">
-                <Text className="text-gray-400 text-[10px]">Jadwal Layanan</Text>
+                <Text className="text-gray-400 text-[10px]">
+                  {isProductOrder ? "Jadwal Pengiriman" : "Jadwal Layanan"}
+                </Text>
                 <Text className="text-gray-700 font-bold text-xs">
-                  {order.scheduled_date} • {order.scheduled_time?.substring(0, 5)}
+                  {isProductOrder
+                    ? order.estimated_delivery || order.scheduled_date || "-"
+                    : `${order.scheduled_date} • ${order.scheduled_time?.substring(0, 5) || "-"}`}
                 </Text>
               </View>
             </View>
@@ -164,60 +173,105 @@ export default function DetailOrderScreen() {
 
           {/* Card 2: Detail Pelanggan & Mitra */}
           <View className="bg-white p-5 rounded-[10px]">
-            <Text className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">Detail Pelanggan & Mitra</Text>
+            <Text className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4">
+              {isProductOrder ? "Detail Pembeli & Penjual" : "Detail Pelanggan & Mitra"}
+            </Text>
             <View className="space-y-4">
               <View className="flex-row items-center">
                 <User size={20} color="#633594" className="opacity-70" />
                 <View className="ml-4">
-                  <Text className="text-[10px] text-gray-400">Customer</Text>
+                  <Text className="text-[10px] text-gray-400">
+                    {isProductOrder ? "Pembeli" : "Customer"}
+                  </Text>
                   <Text className="font-bold text-gray-800">{order.customer_name}</Text>
                 </View>
               </View>
               <View className="flex-row items-center">
                 <Wrench size={20} color="#633594" className="opacity-70" />
                 <View className="ml-4">
-                  <Text className="text-[10px] text-gray-400">Mitra</Text>
+                  <Text className="text-[10px] text-gray-400">
+                    {isProductOrder ? "Penjual" : "Mitra"}
+                  </Text>
                   <Text className="font-bold text-gray-800">{order.mitra_name || "Menunggu..."}</Text>
                 </View>
               </View>
-              <View className="flex-row items-center">
-                <Building2 size={20} color="#633594" className="opacity-70" />
-                <View className="ml-4">
-                  <Text className="text-[10px] text-gray-400">Jenis Gedung</Text>
-                  <Text className="font-bold text-gray-800">{order.building_type}</Text>
+
+              {/* 🔥 Hanya tampil untuk Layanan */}
+              {!isProductOrder && (
+                <View className="flex-row items-center">
+                  <Building2 size={20} color="#633594" className="opacity-70" />
+                  <View className="ml-4">
+                    <Text className="text-[10px] text-gray-400">Jenis Gedung</Text>
+                    <Text className="font-bold text-gray-800">{order.building_type}</Text>
+                  </View>
                 </View>
-              </View>
+              )}
             </View>
           </View>
 
-          {/* Card 3: Lokasi */}
+          {/* Card 3: Lokasi & Catatan */}
           <View className="bg-white p-5 rounded-[10px]">
             <View className="flex-row items-center mb-4">
               <MapPin size={18} color="#633594" />
-              <Text className="ml-2 text-gray-400 text-xs font-bold uppercase tracking-wider">Lokasi & Catatan</Text>
+              <Text className="ml-2 text-gray-400 text-xs font-bold uppercase tracking-wider">
+                {isProductOrder ? "Alamat Pengiriman" : "Lokasi & Catatan"}
+              </Text>
             </View>
             <Text className="text-gray-700 leading-5">{order.address_customer}</Text>
+
+            {isProductOrder && order.recipient_name && (
+              <View className="mt-3 p-3 bg-gray-50 rounded-xl">
+                <Text className="text-xs text-gray-500">Nama Penerima</Text>
+                <Text className="font-bold text-gray-700">{order.recipient_name}</Text>
+              </View>
+            )}
+
+            {isProductOrder && order.recipient_phone && (
+              <View className="mt-2 p-3 bg-gray-50 rounded-xl">
+                <Text className="text-xs text-gray-500">Nomor Telepon Penerima</Text>
+                <Text className="font-bold text-gray-700">{order.recipient_phone}</Text>
+              </View>
+            )}
+
             {order.customer_notes && (
               <View className="mt-4 p-3 bg-gray-50 rounded-xl flex-row items-start">
                 <Info size={16} color="#633594" className="mt-0.5" />
-                <Text className="ml-2 text-xs text-gray-600 flex-1">{order.customer_notes}</Text>
+                <Text className="ml-2 text-xs text-gray-600 flex-1">
+                  {isProductOrder ? "Catatan Pembeli" : "Catatan Pelanggan"}: {order.customer_notes}
+                </Text>
               </View>
             )}
           </View>
 
           {/* Card 4: Rincian Biaya & Layanan */}
           {(() => {
-            const buildingFee = order.building_type === "Rumah" ? 0 : 5000;
-            const totalPrice = parseInt(order.total_price) + parseInt(order.platform_fee) + parseInt(order.service_fee);
+            const buildingFee = !isProductOrder && order.building_type !== "Rumah" ? 5000 : 0;
 
-            const discountAmount = order.discount_amount;
-            const finalTotalPrice = totalPrice - discountAmount;
+            const adminPgFee = isProductOrder
+              ? parseInt(String(order.transaction_fee)) || 0
+              : parseInt(String(order.service_fee)) || 0;
+
+            const shippingFee = isProductOrder ? parseInt(String(order.shipping_fee)) || 0 : 0;
+            const protectionFee = isProductOrder ? parseInt(String(order.protection_fee)) || 0 : 0;
+            const platformFee = parseInt(String(order.platform_fee)) || 0;
+            const baseTotal = parseInt(String(order.total_price)) || 0;
+            const discountAmount = order.discount_amount || 0;
+
+            const finalTotalPrice = isProductOrder
+              ? baseTotal
+              : baseTotal + platformFee + adminPgFee - discountAmount;
 
             return (
               <View className="bg-white p-5 rounded-[10px]">
                 <View className="flex-row items-center mb-4">
-                  <FileText size={18} color="#633594" />
-                  <Text className="ml-2 text-gray-400 text-xs font-bold uppercase tracking-wider">Rincian Layanan</Text>
+                  {isProductOrder ? (
+                    <Package size={18} color="#633594" />
+                  ) : (
+                    <FileText size={18} color="#633594" />
+                  )}
+                  <Text className="ml-2 text-gray-400 text-xs font-bold uppercase tracking-wider">
+                    {isProductOrder ? "Rincian Produk" : "Rincian Layanan"}
+                  </Text>
                 </View>
 
                 {services.map((item: OrderItem, index: number) => (
@@ -229,17 +283,38 @@ export default function DetailOrderScreen() {
                   </View>
                 ))}
 
-                <View className="flex-row justify-between mb-2">
-                  <Text className="text-gray-500">Biaya Gedung ({order.building_type})</Text>
-                  <Text className="text-gray-800 font-medium">Rp {buildingFee.toLocaleString("id-ID")}</Text>
-                </View>
+                {/* Biaya Gedung — hanya relevan untuk order jasa */}
+                {!isProductOrder && (
+                  <View className="flex-row justify-between mb-2">
+                    <Text className="text-gray-500">Biaya Gedung ({order.building_type})</Text>
+                    <Text className="text-gray-800 font-medium">Rp {buildingFee.toLocaleString("id-ID")}</Text>
+                  </View>
+                )}
 
                 <View className="flex-row justify-between mb-2">
-                  <Text className="text-gray-500">Biaya Layanan</Text>
-                  <Text className="text-gray-800 font-medium">Rp {parseInt(order.platform_fee).toLocaleString("id-ID")}</Text>
+                  <Text className="text-gray-500">
+                    {isProductOrder ? "Biaya Platform" : "Biaya Layanan"}
+                  </Text>
+                  <Text className="text-gray-800 font-medium">Rp {platformFee.toLocaleString("id-ID")}</Text>
                 </View>
 
-                {/* LOGIKA DISCOUNT: Tampil di bawah Biaya Layanan jika > 0 */}
+                {/* Biaya Pengiriman — hanya untuk order produk */}
+                {isProductOrder && shippingFee > 0 && (
+                  <View className="flex-row justify-between mb-2">
+                    <Text className="text-gray-500">Biaya Pengiriman</Text>
+                    <Text className="text-gray-800 font-medium">Rp {shippingFee.toLocaleString("id-ID")}</Text>
+                  </View>
+                )}
+
+                {/* Proteksi Kerusakan — hanya untuk order produk */}
+                {isProductOrder && protectionFee > 0 && (
+                  <View className="flex-row justify-between mb-2">
+                    <Text className="text-gray-500">Proteksi Kerusakan</Text>
+                    <Text className="text-gray-800 font-medium">Rp {protectionFee.toLocaleString("id-ID")}</Text>
+                  </View>
+                )}
+
+                {/* DISCOUNT */}
                 {discountAmount > 0 && (
                   <View className="flex-row justify-between mb-2">
                     <Text className="text-red-500 font-medium">Diskon</Text>
@@ -247,27 +322,67 @@ export default function DetailOrderScreen() {
                   </View>
                 )}
 
+                {/* Biaya Admin */}
                 <View className="flex-row justify-between mb-2">
-                  <Text className="text-gray-500">Biaya Admin (PG)</Text>
-                  <Text className="text-gray-800 font-medium">Rp {parseInt(order.service_fee).toLocaleString("id-ID")}</Text>
+                  <Text className="text-gray-500">
+                    {isProductOrder
+                      ? `Biaya Admin (PG)${order.payment_method ? ` - ${order.payment_method}` : ""}`
+                      : "Biaya Admin (PG)"
+                    }
+                  </Text>
+                  <Text className="text-gray-800 font-medium">Rp {adminPgFee.toLocaleString("id-ID")}</Text>
                 </View>
 
                 <View className="mt-4 pt-4 border-t border-dashed border-gray-200 flex-row justify-between items-center">
-                  <Text className="font-bold text-gray-800 text-base">Total Pembayaran</Text>
+                  <Text className="font-bold text-gray-800 text-base">
+                    {isProductOrder ? "Total Pembayaran" : "Total Pembayaran"}
+                  </Text>
                   <Text className="font-bold text-xl text-[#633594]">
-                    {/* Gunakan variabel yang sudah dikurangi diskon */}
                     Rp {finalTotalPrice.toLocaleString("id-ID")}
                   </Text>
                 </View>
+
+                {isProductOrder && order.payment_method && (
+                  <View className="mt-3 pt-3 border-t border-gray-100 flex-row items-center">
+                    <CreditCard size={16} color="#633594" />
+                    <Text className="ml-2 text-xs text-gray-600">
+                      Metode Pembayaran: <Text className="font-bold">{order.payment_method}</Text>
+                    </Text>
+                  </View>
+                )}
               </View>
             );
           })()}
 
-          {/* Card 5: Bukti Pengerjaan */}
+          {/* Card 5: Bukti Pengerjaan / Pengiriman */}
           {order.proof_image_url && (
             <View className="bg-white p-5 rounded-[10px] overflow-hidden">
-              <Text className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Bukti Pengerjaan</Text>
+              <Text className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">
+                {isProductOrder ? "Bukti Pengiriman" : "Bukti Pengerjaan"}
+              </Text>
               <Image source={{ uri: order.proof_image_url }} className="w-full h-60 rounded-2xl" />
+            </View>
+          )}
+
+          {/* Card 6: Tracking Pengiriman (Khusus Produk) */}
+          {isProductOrder && order.tracking_number && (
+            <View className="bg-white p-5 rounded-[10px]">
+              <View className="flex-row items-center mb-3">
+                <Truck size={18} color="#633594" />
+                <Text className="ml-2 text-gray-400 text-xs font-bold uppercase tracking-wider">
+                  Informasi Pengiriman
+                </Text>
+              </View>
+              <View className="p-3 bg-purple-50 rounded-xl">
+                <Text className="text-xs text-gray-600">Nomor Resi</Text>
+                <Text className="font-bold text-gray-800">{order.tracking_number}</Text>
+                {order.courier_name && (
+                  <>
+                    <Text className="text-xs text-gray-600 mt-2">Kurir</Text>
+                    <Text className="font-bold text-gray-800">{order.courier_name}</Text>
+                  </>
+                )}
+              </View>
             </View>
           )}
         </View>

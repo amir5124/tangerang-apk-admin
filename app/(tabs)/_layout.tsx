@@ -1,5 +1,12 @@
 import { Redirect, Tabs } from "expo-router";
-import { LayoutDashboard, Package, ShoppingCart, SquareMenu, User } from "lucide-react-native";
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  SquareMenu,
+  User,
+  Users
+} from "lucide-react-native";
 import { canAccessTab, getRoleByEmail } from "../../constants/rolesByEmail";
 import { SessionContext } from "../../src/context/SessionContext";
 import { useSession } from "../../src/hooks/useSession";
@@ -22,45 +29,110 @@ export default function TabLayout() {
           tabBarActiveTintColor: "#633594",
           tabBarInactiveTintColor: "#95a5a6",
           headerShown: false,
-          tabBarStyle: { paddingBottom: 5, height: 60 },
+          tabBarStyle: {
+            paddingBottom: 5,
+            height: 60,
+            backgroundColor: '#fff',
+            borderTopWidth: 1,
+            borderTopColor: '#e5e7eb',
+          },
           tabBarLabelStyle: { fontSize: 11, fontWeight: "600", marginTop: 2 },
         }}
       >
+        {/* Tab 1: Dashboard */}
         <Tabs.Screen
           name="index"
           options={{
             title: "Dashboard",
-            tabBarIcon: ({ color }) => <LayoutDashboard size={24} color={color} />,
+            tabBarIcon: ({ color, focused }) => (
+              <LayoutDashboard
+                size={24}
+                color={focused ? "#633594" : color}
+                strokeWidth={focused ? 2.5 : 2}
+              />
+            ),
           }}
         />
+
+        {/* Tab 2: Appku */}
         <Tabs.Screen
           name="myapps"
           options={{
             title: "Appku",
-            tabBarIcon: ({ color }) => <Package size={24} color={color} />,
+            tabBarIcon: ({ color, focused }) => (
+              <Package
+                size={24}
+                color={focused ? "#633594" : color}
+                strokeWidth={focused ? 2.5 : 2}
+              />
+            ),
           }}
         />
+
+        {/* Tab 3: ART Order - HANYA UNTUK ADMIN */}
+        <Tabs.Screen
+          name="art-order"
+          options={{
+            title: "ART Order",
+
+            tabBarIcon: ({ color, focused }) => (
+              <Users
+                size={24}
+                color={focused ? "#633594" : color}
+                strokeWidth={focused ? 2.5 : 2}
+              />
+            ),
+          }}
+        />
+
+        {/* Tab 4: Laporan */}
         <Tabs.Screen
           name="reports"
           options={{
             title: "Laporan",
-            tabBarIcon: ({ color }) => <SquareMenu size={24} color={color} />,
+            href: can('reports') ? "/reports" : null,
+            tabBarIcon: ({ color, focused }) => (
+              <SquareMenu
+                size={24}
+                color={focused ? "#633594" : color}
+                strokeWidth={focused ? 2.5 : 2}
+              />
+            ),
           }}
         />
+
+        {/* Tab 5: Pesanan */}
         <Tabs.Screen
           name="orders"
           options={{
             title: "Pesanan",
-            tabBarIcon: ({ color }) => <ShoppingCart size={24} color={color} />,
+            href: can('orders') ? "/orders" : null,
+            tabBarIcon: ({ color, focused }) => (
+              <ShoppingCart
+                size={24}
+                color={focused ? "#633594" : color}
+                strokeWidth={focused ? 2.5 : 2}
+              />
+            ),
           }}
         />
+
+        {/* Tab 6: Profil */}
         <Tabs.Screen
           name="profile"
           options={{
             title: "Profil",
-            tabBarIcon: ({ color }) => <User size={24} color={color} />,
+            tabBarIcon: ({ color, focused }) => (
+              <User
+                size={24}
+                color={focused ? "#633594" : color}
+                strokeWidth={focused ? 2.5 : 2}
+              />
+            ),
           }}
         />
+
+
       </Tabs>
     </SessionContext.Provider>
   );
