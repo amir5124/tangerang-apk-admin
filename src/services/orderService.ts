@@ -3,7 +3,6 @@ import { ApiResponse, Order } from "../types/order";
 import API from "../utils/api";
 
 // ✅ Ubah base URL sesuai dengan backend
-// Backend pake /api/pesanan, bukan /api/art/pesanan
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://backend.tangerangfast.online/api';
 
 export const orderService = {
@@ -31,7 +30,6 @@ export const orderService = {
 
   /**
    * Get SEMUA pesanan ART/Babysitter (untuk admin)
-   * ✅ Ubah dari /art/pesanan ke /pesanan
    */
   getAllOrdersArt: async () => {
     const response = await axios.get(`${API_BASE_URL}/pesanan`);
@@ -40,7 +38,6 @@ export const orderService = {
 
   /**
    * Get detail pesanan ART/Babysitter by ID
-   * ✅ Ubah dari /art/pesanan/:id ke /pesanan/:id
    */
   getDetailOrderArt: async (id: string) => {
     const response = await axios.get(`${API_BASE_URL}/pesanan/${id}`);
@@ -48,17 +45,54 @@ export const orderService = {
   },
 
   /**
-   * Update status pesanan ART/Babysitter (admin)
-   * ✅ Ubah dari /art/pesanan/:id/status ke /pesanan/:id/status
+   * ✅ UPDATE STATUS PESANAN - FIXED
+   * Menerima extraPayload untuk field tambahan (gomeet_link, call_date, call_slot, dll)
    */
-  updateStatusArt: async (id: string, status: string) => {
-    const response = await axios.put(`${API_BASE_URL}/pesanan/${id}/status`, { status });
+  updateStatusArt: async (id: string, status: string, extraPayload?: Record<string, any>) => {
+    // Build payload - SELALU kirim status
+    const payload: any = { status };
+    
+    // Jika ada extraPayload, tambahkan ke payload
+    if (extraPayload) {
+      // Untuk status 'calling', kirim semua field yang diperlukan
+      if (status === 'calling') {
+        payload.gomeet_link = extraPayload.gomeet_link || '';
+        payload.call_date = extraPayload.call_date || '';
+        payload.call_slot = extraPayload.call_slot || '';
+      }
+      
+      // Untuk status 'berangkat_siap_diantar'
+      if (status === 'berangkat_siap_diantar') {
+        payload.departure_method = extraPayload.departure_method || '';
+        payload.departure_date = extraPayload.departure_date || '';
+      }
+      
+      // Tambahkan field lain jika ada
+      Object.keys(extraPayload).forEach(key => {
+        if (!['gomeet_link', 'call_date', 'call_slot', 'departure_method', 'departure_date'].includes(key)) {
+          payload[key] = extraPayload[key];
+        }
+      });
+    }
+
+    console.log('📤 updateStatusArt - Sending payload:', JSON.stringify(payload, null, 2));
+
+    const response = await axios.put(
+      `${API_BASE_URL}/pesanan/${id}/status`,
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+    
+    console.log('✅ updateStatusArt - Response:', response.data);
     return response.data;
   },
 
   /**
    * Update matching status (admin)
-   * ✅ Ubah dari /art/pesanan/:id/matching ke /pesanan/:id/matching
    */
   updateMatchingStatus: async (id: string, matching_status: string) => {
     const response = await axios.put(`${API_BASE_URL}/pesanan/${id}/matching`, { matching_status });
@@ -67,7 +101,6 @@ export const orderService = {
 
   /**
    * Get pesanan ART by status (admin filter)
-   * ✅ Ubah dari /art/pesanan/status/:status ke /pesanan/status/:status
    */
   getOrdersArtByStatus: async (status: string) => {
     const response = await axios.get(`${API_BASE_URL}/pesanan/status/${status}`);
@@ -76,7 +109,6 @@ export const orderService = {
 
   /**
    * Get pesanan ART by matching status (admin filter)
-   * ✅ Ubah dari /art/pesanan/matching/:matchingStatus ke /pesanan/matching/:matchingStatus
    */
   getOrdersArtByMatchingStatus: async (matchingStatus: string) => {
     const response = await axios.get(`${API_BASE_URL}/pesanan/matching/${matchingStatus}`);
@@ -85,7 +117,6 @@ export const orderService = {
 
   /**
    * Delete pesanan ART (admin)
-   * ✅ Ubah dari /art/pesanan/:id ke /pesanan/:id
    */
   deleteOrderArt: async (id: string) => {
     const response = await axios.delete(`${API_BASE_URL}/pesanan/${id}`);
@@ -94,7 +125,6 @@ export const orderService = {
 
   /**
    * Get statistik pesanan ART (admin)
-   * ✅ Ubah dari /art/pesanan/statistik ke /pesanan/statistik
    */
   getStatistikOrderArt: async () => {
     const response = await axios.get(`${API_BASE_URL}/pesanan/statistik`);
@@ -103,7 +133,6 @@ export const orderService = {
 
   /**
    * Get laporan per tanggal ART (admin)
-   * ✅ Ubah dari /art/pesanan/laporan ke /pesanan/laporan
    */
   getLaporanPerTanggal: async (startDate: string, endDate: string) => {
     const response = await axios.get(`${API_BASE_URL}/pesanan/laporan`, {
@@ -114,15 +143,8 @@ export const orderService = {
 };
 
 // ============================================================
-// TYPE DEFINITIONS
+// TYPE DEFINITIONS - UPDATE dengan field baru
 // ============================================================
-export interface ArtOrderResponse {
-  success: boolean;
-  message: string;
-  data: ArtOrder | ArtOrder[];
-  total?: number;
-}
-
 export interface ArtOrder {
   id: number;
   order_id: string;
@@ -172,14 +194,20 @@ export interface ArtOrder {
   voc_diskon: number;
   voc_type: string;
   voc_valid: string;
-  status: 'pending' | 'paid' | 'matching' | 'approved' | 'calling' | 'working' | 'done' | 'completed' | 'rejected' | 'cancelled';
+  status: 'pending' | 'paid' | 'matching' | 'approved' | 'calling' | 'working' | 'done' | 'completed' | 'rejected' | 'cancelled' | 'rejected_searching' | 'berangkat_dari_cicana' | 'berangkat_cek_kesehatan' | 'berangkat_siap_diantar';
   matching_status: 'pending' | 'matching' | 'approved' | 'rejected';
+  // ✅ FIELD BARU untuk Conference Call
+  gomeet_link?: string;
+  call_date?: string;
+  call_slot?: string;
+  departure_method?: string;
+  departure_date?: string;
   created_at: string;
   updated_at: string;
 }
 
 // ============================================================
-// HELPER FUNCTIONS UNTUK STATUS
+// HELPER FUNCTIONS UNTUK STATUS - UPDATE
 // ============================================================
 export const ArtOrderStatus = {
   PENDING: 'pending' as const,
@@ -191,7 +219,11 @@ export const ArtOrderStatus = {
   DONE: 'done' as const,
   COMPLETED: 'completed' as const,
   REJECTED: 'rejected' as const,
+  REJECTED_SEARCHING: 'rejected_searching' as const,
   CANCELLED: 'cancelled' as const,
+  BERANGKAT_DARI_CICANA: 'berangkat_dari_cicana' as const,
+  BERANGKAT_CEK_KESEHATAN: 'berangkat_cek_kesehatan' as const,
+  BERANGKAT_SIAP_DIANTAR: 'berangkat_siap_diantar' as const,
 
   MATCHING_PENDING: 'pending' as const,
   MATCHING_SEARCHING: 'matching' as const,
@@ -202,13 +234,17 @@ export const ArtOrderStatus = {
     const map: Record<string, string> = {
       'pending': 'Menunggu Pembayaran',
       'paid': 'Dibayar',
-      'matching': 'Mencari Pekerja',
+      'matching': 'Pencocokan',
       'approved': 'Disetujui',
-      'calling': 'Menghubungi',
+      'calling': 'Conference Call',
       'working': 'Sedang Bekerja',
+      'berangkat_dari_cicana': 'Berangkat dari Cicana',
+      'berangkat_cek_kesehatan': 'Cek Kesehatan',
+      'berangkat_siap_diantar': 'Siap Diantar',
       'done': 'Selesai',
       'completed': 'Selesai',
       'rejected': 'Ditolak',
+      'rejected_searching': 'Ditolak - Masih Mencari',
       'cancelled': 'Dibatalkan'
     };
     return map[status] || status;
@@ -220,11 +256,15 @@ export const ArtOrderStatus = {
       'paid': '#3B82F6',
       'matching': '#8B5CF6',
       'approved': '#10B981',
-      'calling': '#F59E0B',
-      'working': '#3B82F6',
+      'calling': '#EC4899',
+      'working': '#F97316',
+      'berangkat_dari_cicana': '#0EA5E9',
+      'berangkat_cek_kesehatan': '#14B8A6',
+      'berangkat_siap_diantar': '#22C55E',
       'done': '#10B981',
       'completed': '#10B981',
       'rejected': '#EF4444',
+      'rejected_searching': '#FB923C',
       'cancelled': '#EF4444'
     };
     return map[status] || '#6B7280';
@@ -236,11 +276,15 @@ export const ArtOrderStatus = {
       'paid': 'bg-blue-50',
       'matching': 'bg-purple-50',
       'approved': 'bg-green-50',
-      'calling': 'bg-yellow-50',
-      'working': 'bg-blue-50',
+      'calling': 'bg-pink-50',
+      'working': 'bg-orange-50',
+      'berangkat_dari_cicana': 'bg-sky-50',
+      'berangkat_cek_kesehatan': 'bg-teal-50',
+      'berangkat_siap_diantar': 'bg-emerald-50',
       'done': 'bg-green-50',
       'completed': 'bg-green-50',
       'rejected': 'bg-red-50',
+      'rejected_searching': 'bg-orange-50',
       'cancelled': 'bg-red-50'
     };
     return map[status] || 'bg-gray-50';
@@ -260,20 +304,24 @@ export const ArtOrderStatus = {
     const flow: Record<string, string[]> = {
       'pending': ['paid', 'cancelled'],
       'paid': ['matching', 'cancelled'],
-      'matching': ['approved', 'rejected', 'cancelled'],
+      'matching': ['approved', 'rejected_searching', 'cancelled'],
       'approved': ['calling', 'cancelled'],
-      'calling': ['working', 'cancelled'],
-      'working': ['done', 'cancelled'],
+      'calling': ['working', 'rejected', 'rejected_searching', 'cancelled'],
+      'working': ['berangkat_dari_cicana', 'rejected', 'rejected_searching', 'cancelled'],
+      'berangkat_dari_cicana': ['berangkat_cek_kesehatan', 'cancelled'],
+      'berangkat_cek_kesehatan': ['berangkat_siap_diantar', 'cancelled'],
+      'berangkat_siap_diantar': ['completed', 'cancelled'],
+      'rejected_searching': ['matching', 'cancelled'],
+      'rejected': [],
       'done': [],
       'completed': [],
-      'rejected': [],
       'cancelled': []
     };
     return flow[currentStatus] || [];
   },
 
   isValidStatus: (status: string): boolean => {
-    const valid = ['pending', 'paid', 'matching', 'approved', 'calling', 'working', 'done', 'completed', 'rejected', 'cancelled'];
+    const valid = ['pending', 'paid', 'matching', 'approved', 'calling', 'working', 'berangkat_dari_cicana', 'berangkat_cek_kesehatan', 'berangkat_siap_diantar', 'done', 'completed', 'rejected', 'rejected_searching', 'cancelled'];
     return valid.includes(status);
   },
 
@@ -281,12 +329,16 @@ export const ArtOrderStatus = {
     return [
       { value: 'pending', label: 'Menunggu Pembayaran' },
       { value: 'paid', label: 'Dibayar' },
-      { value: 'matching', label: 'Mencari Pekerja' },
+      { value: 'matching', label: 'Pencocokan' },
       { value: 'approved', label: 'Disetujui' },
-      { value: 'calling', label: 'Menghubungi' },
+      { value: 'calling', label: 'Conference Call' },
       { value: 'working', label: 'Sedang Bekerja' },
+      { value: 'berangkat_dari_cicana', label: 'Berangkat dari Cicana' },
+      { value: 'berangkat_cek_kesehatan', label: 'Cek Kesehatan' },
+      { value: 'berangkat_siap_diantar', label: 'Siap Diantar' },
       { value: 'done', label: 'Selesai' },
       { value: 'rejected', label: 'Ditolak' },
+      { value: 'rejected_searching', label: 'Ditolak - Masih Mencari' },
       { value: 'cancelled', label: 'Dibatalkan' }
     ];
   },

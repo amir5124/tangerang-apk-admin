@@ -1,15 +1,21 @@
-export type UserRole = "super_admin" | "admin_aplikasi" | "admin_finance";
+export type UserRole =
+    | "super_admin"
+    | "admin_aplikasi"
+    | "admin_finance"
+    | "admin_art_babysitter";
 
 export const EMAIL_ROLE_MAP: Record<string, UserRole> = {
     "superadmin@gmail.com": "super_admin",
     "adminaplikasi@gmail.com": "admin_aplikasi",
     "adminfinance@gmail.com": "admin_finance",
+    "cicana.co@gmail.com": "admin_art_babysitter",
 };
 
 export const ROLE_TABS: Record<UserRole, string[]> = {
     super_admin: ["index", "myapps", "reports", "orders", "profile", "withdraw"],
     admin_aplikasi: ["myapps", "profile"],
     admin_finance: ["reports", "orders", "profile", "withdraw"],
+    admin_art_babysitter: ["art-order"],
 };
 
 export function getRoleByEmail(email: string): UserRole | null {
