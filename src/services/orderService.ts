@@ -51,7 +51,7 @@ export const orderService = {
   updateStatusArt: async (id: string, status: string, extraPayload?: Record<string, any>) => {
     // Build payload - SELALU kirim status
     const payload: any = { status };
-    
+
     // Jika ada extraPayload, tambahkan ke payload
     if (extraPayload) {
       // Untuk status 'calling', kirim semua field yang diperlukan
@@ -60,13 +60,13 @@ export const orderService = {
         payload.call_date = extraPayload.call_date || '';
         payload.call_slot = extraPayload.call_slot || '';
       }
-      
+
       // Untuk status 'berangkat_siap_diantar'
       if (status === 'berangkat_siap_diantar') {
         payload.departure_method = extraPayload.departure_method || '';
         payload.departure_date = extraPayload.departure_date || '';
       }
-      
+
       // Tambahkan field lain jika ada
       Object.keys(extraPayload).forEach(key => {
         if (!['gomeet_link', 'call_date', 'call_slot', 'departure_method', 'departure_date'].includes(key)) {
@@ -86,7 +86,7 @@ export const orderService = {
         }
       }
     );
-    
+
     console.log('✅ updateStatusArt - Response:', response.data);
     return response.data;
   },
@@ -138,6 +138,82 @@ export const orderService = {
     const response = await axios.get(`${API_BASE_URL}/pesanan/laporan`, {
       params: { start_date: startDate, end_date: endDate }
     });
+    return response.data;
+  },
+
+  // ============================================================
+  // ✅ FUNGSI KOMPLAIN - PAKAI /api/pesanan/complaints
+  // ============================================================
+
+  /**
+   * ADMIN: Get semua komplain, optional filter by status ('pending' | 'approved' | 'rejected')
+   */
+  getAllComplaints: async (status?: string) => {
+    const response = await axios.get(`${API_BASE_URL}/pesanan/complaints`, {
+      params: status && status !== 'all' ? { status } : {},
+    });
+    return response.data;
+  },
+
+  /**
+   * ADMIN: Get detail komplain by ID
+   */
+  getComplaintById: async (id: string | number) => {
+    const response = await axios.get(`${API_BASE_URL}/pesanan/complaints/${id}`);
+    return response.data;
+  },
+
+  /**
+   * USER: Riwayat komplain milik customer
+   */
+  getComplaintsByCustomer: async (custId: string | number) => {
+    const response = await axios.get(`${API_BASE_URL}/pesanan/complaints/customer/${custId}`);
+    return response.data;
+  },
+
+  /**
+   * USER: Cek apakah pesanan tertentu sudah pernah dikomplain (+ status terakhirnya)
+   */
+  getComplaintByPesananId: async (pesananId: string | number) => {
+    const response = await axios.get(`${API_BASE_URL}/pesanan/complaints/pesanan/${pesananId}`);
+    return response.data;
+  },
+
+  /**
+   * USER: Cek voucher diskon aktif milik customer (belum dipakai)
+   */
+  getActiveDiscountVoucher: async (custId: string | number) => {
+    const response = await axios.get(`${API_BASE_URL}/pesanan/complaints/voucher/${custId}`);
+    return response.data;
+  },
+
+  /**
+   * USER: Ajukan komplain baru atas sebuah pesanan
+   */
+  createComplaint: async (payload: { pesanan_id: string | number; cust_id: string | number; reason: string }) => {
+    const response = await axios.post(`${API_BASE_URL}/pesanan/complaints`, payload);
+    return response.data;
+  },
+
+  /**
+   * ADMIN: Approve komplain (backend otomatis menerbitkan voucher diskon untuk order berikutnya)
+   */
+  approveComplaint: async (
+    id: string | number,
+    payload: { admin_note?: string; resolved_by?: string; discount_percent?: number }
+  ) => {
+    const response = await axios.put(`${API_BASE_URL}/pesanan/complaints/${id}/approve`, payload);
+    return response.data;
+  },
+
+  /**
+   * ADMIN: Reject komplain
+   */
+  rejectComplaint: async (
+    id: string | number,
+    payload: { admin_note?: string; resolved_by?: string }
+  ) => {
+    const response = await axios.put(`${API_BASE_URL}/pesanan/complaints/${id}/reject`, payload);
     return response.data;
   },
 };
@@ -207,7 +283,38 @@ export interface ArtOrder {
 }
 
 // ============================================================
+// ✅ TYPE DEFINITION - KOMPLAIN
+// ============================================================
+export interface Complaint {
+  id: number;
+  pesanan_id: number;
+  cust_id: number;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  admin_note?: string;
+  resolved_by?: string;
+  resolved_at?: string;
+  created_at: string;
+  // hasil JOIN dari getAllComplaints / getComplaintsByCustomer
+  order_id?: string;
+  total?: number;
+  worker_gaji_min?: string;
+  worker_nama?: string;
+}
+
+export interface DiscountVoucher {
+  id: number;
+  cust_id: number;
+  complaint_id: number;
+  discount_type: string;
+  discount_percent: number;
+  is_used: 0 | 1;
+  created_at: string;
+}
+
+// ============================================================
 // HELPER FUNCTIONS UNTUK STATUS - UPDATE
+// (working dipindah jadi status terakhir sebelum completed)
 // ============================================================
 export const ArtOrderStatus = {
   PENDING: 'pending' as const,
@@ -300,17 +407,21 @@ export const ArtOrderStatus = {
     return map[status] || status;
   },
 
+  /**
+   * ✅ FLOW BARU: working dipindah jadi status terakhir sebelum completed
+   * (ART dianggap "bekerja" setelah proses keberangkatan selesai, bukan sebelum berangkat)
+   */
   getNextStatuses: (currentStatus: string): string[] => {
     const flow: Record<string, string[]> = {
       'pending': ['paid', 'cancelled'],
       'paid': ['matching', 'cancelled'],
       'matching': ['approved', 'rejected_searching', 'cancelled'],
       'approved': ['calling', 'cancelled'],
-      'calling': ['working', 'rejected', 'rejected_searching', 'cancelled'],
-      'working': ['berangkat_dari_cicana', 'rejected', 'rejected_searching', 'cancelled'],
+      'calling': ['berangkat_dari_cicana', 'rejected', 'rejected_searching', 'cancelled'],
       'berangkat_dari_cicana': ['berangkat_cek_kesehatan', 'cancelled'],
       'berangkat_cek_kesehatan': ['berangkat_siap_diantar', 'cancelled'],
-      'berangkat_siap_diantar': ['completed', 'cancelled'],
+      'berangkat_siap_diantar': ['working', 'cancelled'],
+      'working': ['completed', 'rejected', 'cancelled'],
       'rejected_searching': ['matching', 'cancelled'],
       'rejected': [],
       'done': [],
@@ -325,6 +436,9 @@ export const ArtOrderStatus = {
     return valid.includes(status);
   },
 
+  /**
+   * ✅ Urutan tampilan disamakan dengan flow baru (working sebelum completed)
+   */
   getStatusOptions: () => {
     return [
       { value: 'pending', label: 'Menunggu Pembayaran' },
@@ -332,10 +446,10 @@ export const ArtOrderStatus = {
       { value: 'matching', label: 'Pencocokan' },
       { value: 'approved', label: 'Disetujui' },
       { value: 'calling', label: 'Conference Call' },
-      { value: 'working', label: 'Sedang Bekerja' },
       { value: 'berangkat_dari_cicana', label: 'Berangkat dari Cicana' },
       { value: 'berangkat_cek_kesehatan', label: 'Cek Kesehatan' },
       { value: 'berangkat_siap_diantar', label: 'Siap Diantar' },
+      { value: 'working', label: 'Sedang Bekerja' },
       { value: 'done', label: 'Selesai' },
       { value: 'rejected', label: 'Ditolak' },
       { value: 'rejected_searching', label: 'Ditolak - Masih Mencari' },
@@ -347,6 +461,42 @@ export const ArtOrderStatus = {
     return [
       { value: 'pending', label: 'Menunggu' },
       { value: 'matching', label: 'Sedang Mencari' },
+      { value: 'approved', label: 'Disetujui' },
+      { value: 'rejected', label: 'Ditolak' }
+    ];
+  }
+};
+
+// ============================================================
+// ✅ HELPER FUNCTIONS UNTUK KOMPLAIN
+// ============================================================
+export const ComplaintStatus = {
+  PENDING: 'pending' as const,
+  APPROVED: 'approved' as const,
+  REJECTED: 'rejected' as const,
+
+  getStatusLabel: (status: string): string => {
+    const map: Record<string, string> = {
+      'pending': 'Menunggu Review',
+      'approved': 'Disetujui',
+      'rejected': 'Ditolak'
+    };
+    return map[status] || status;
+  },
+
+  getStatusColor: (status: string): string => {
+    const map: Record<string, string> = {
+      'pending': '#F59E0B',
+      'approved': '#10B981',
+      'rejected': '#EF4444'
+    };
+    return map[status] || '#6B7280';
+  },
+
+  getFilterOptions: () => {
+    return [
+      { value: 'all', label: 'Semua' },
+      { value: 'pending', label: 'Menunggu' },
       { value: 'approved', label: 'Disetujui' },
       { value: 'rejected', label: 'Ditolak' }
     ];

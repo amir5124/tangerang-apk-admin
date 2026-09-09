@@ -2,12 +2,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
     AlertCircle,
+    AlertTriangle,
     Calendar,
     CheckCircle,
     Clock,
     Eye,
     LogOut,
     MapPin,
+    MessageSquareWarning,
     Phone,
     RefreshCw,
     Search,
@@ -33,7 +35,7 @@ import {
     View
 } from "react-native";
 import Toast from "react-native-toast-message";
-import { ArtOrder, orderService } from "../../src/services/orderService";
+import { ArtOrder, Complaint, orderService } from "../../src/services/orderService";
 
 // ============================================================
 // ✅ SLOT JADWAL CONFERENCE CALL (batas akhir 17.00)
@@ -48,6 +50,82 @@ const CALL_SLOTS = [
     "15.00–16.00",
     "16.00–17.00",
 ];
+
+const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+// ============================================================
+// ✅ DATE FIELD — pakai native date picker di web (<input type="date">),
+// TextInput + tombol "Hari Ini" di mobile. Dipakai untuk semua input
+// tanggal di layar ini (jadwal call & tanggal keberangkatan).
+// ============================================================
+function DateField({
+    value,
+    onChange,
+    error,
+    disabled,
+    minDate,
+    placeholder = 'YYYY-MM-DD',
+}: {
+    value: string;
+    onChange: (date: string) => void;
+    error?: string;
+    disabled?: boolean;
+    minDate?: string;
+    placeholder?: string;
+}) {
+    return (
+        <View>
+            <View className={`bg-gray-50 rounded-xl border ${error ? 'border-red-500' : 'border-gray-100'} px-4`}>
+                <View className="flex-row items-center">
+                    <Calendar size={16} color="#9CA3AF" />
+
+                    {Platform.OS === 'web' ? (
+                        <input
+                            type="date"
+                            className="flex-1 py-3 text-gray-700 ml-2 bg-transparent outline-none"
+                            style={{
+                                minWidth: 0,
+                                width: '100%',
+                                border: 'none',
+                                outline: 'none',
+                                fontSize: '14px',
+                                fontFamily: 'inherit',
+                            }}
+                            value={value}
+                            onChange={(e) => onChange(e.target.value)}
+                            min={minDate}
+                            disabled={disabled}
+                        />
+                    ) : (
+                        <TextInput
+                            className="flex-1 py-3 text-gray-700 ml-2"
+                            value={value}
+                            onChangeText={onChange}
+                            placeholder={placeholder}
+                            placeholderTextColor="#9CA3AF"
+                            editable={!disabled}
+                        />
+                    )}
+
+                    <TouchableOpacity
+                        onPress={() => onChange(getTodayDate())}
+                        className="ml-1 px-2 py-1 bg-purple-100 rounded-lg"
+                        disabled={disabled}
+                    >
+                        <Text className="text-[#633594] text-[10px] font-bold">Hari Ini</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+            {error && <Text className="text-red-500 text-[10px] mt-1">{error}</Text>}
+        </View>
+    );
+}
 
 export default function ArtOrderScreen() {
     const params = useLocalSearchParams() as any;
@@ -71,12 +149,25 @@ export default function ArtOrderScreen() {
     const [gomeetLink, setGomeetLink] = useState('');
     const [callDate, setCallDate] = useState('');
     const [callSlot, setCallSlot] = useState('');
-    const [callErrors, setCallErrors] = useState<{link?: string, date?: string, slot?: string}>({});
+    const [callErrors, setCallErrors] = useState<{ link?: string, date?: string, slot?: string }>({});
 
     // Modal alur keberangkatan
     const [showDepartureModal, setShowDepartureModal] = useState(false);
     const [departureMethod, setDepartureMethod] = useState<'driver_online' | 'dijemput_user' | ''>('');
     const [departureDate, setDepartureDate] = useState('');
+
+    // ============================================================
+    // ✅ STATE MANAJEMEN KOMPLAIN
+    // ============================================================
+    const [showComplaintsModal, setShowComplaintsModal] = useState(false);
+    const [complaints, setComplaints] = useState<Complaint[]>([]);
+    const [complaintsLoading, setComplaintsLoading] = useState(false);
+    const [complaintFilter, setComplaintFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+    const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+    const [showComplaintDetail, setShowComplaintDetail] = useState(false);
+    const [complaintAdminNote, setComplaintAdminNote] = useState('');
+    const [complaintDiscountPercent, setComplaintDiscountPercent] = useState('100');
+    const [processingComplaint, setProcessingComplaint] = useState(false);
 
     const [stats, setStats] = useState({
         total: 0,
@@ -100,14 +191,6 @@ export default function ArtOrderScreen() {
     // ============================================================
     // ✅ HELPER FUNCTIONS
     // ============================================================
-    
-    const getTodayDate = () => {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
 
     const isPaid = (order: ArtOrder) => {
         return order.pay_status === 'settlement' ||
@@ -281,6 +364,9 @@ export default function ArtOrderScreen() {
 
     // ============================================================
     // ✅ STATUS FLOW
+    // "working" (Bekerja) dipindah jadi status TERAKHIR sebelum "completed",
+    // setelah seluruh proses keberangkatan (berangkat → cek kesehatan → siap
+    // diantar) selesai. ART baru dianggap "bekerja" setelah sampai tujuan.
     // ============================================================
     const getNextStatuses = (currentStatus: string): string[] => {
         const flowMap: Record<string, string[]> = {
@@ -288,11 +374,11 @@ export default function ArtOrderScreen() {
             'paid': ['matching', 'cancelled'],
             'matching': ['approved', 'rejected_searching', 'cancelled'],
             'approved': ['calling', 'cancelled'],
-            'calling': ['working', 'rejected', 'rejected_searching', 'cancelled'],
-            'working': ['berangkat_dari_cicana', 'rejected', 'rejected_searching', 'cancelled'],
+            'calling': ['berangkat_dari_cicana', 'rejected', 'rejected_searching', 'cancelled'],
             'berangkat_dari_cicana': ['berangkat_cek_kesehatan', 'cancelled'],
             'berangkat_cek_kesehatan': ['berangkat_siap_diantar', 'cancelled'],
-            'berangkat_siap_diantar': ['completed', 'cancelled'],
+            'berangkat_siap_diantar': ['working', 'cancelled'],
+            'working': ['completed', 'rejected', 'cancelled'],
             'rejected_searching': ['matching', 'cancelled'],
             'rejected': [],
             'completed': [],
@@ -410,18 +496,18 @@ export default function ArtOrderScreen() {
     };
 
     // ============================================================
-    // ✅ SUBMIT CALL SCHEDULE (FIXED)
+    // ✅ SUBMIT CALL SCHEDULE
     // ============================================================
     const submitCallSchedule = async () => {
-        const errors: {link?: string, date?: string, slot?: string} = {};
-        
+        const errors: { link?: string, date?: string, slot?: string } = {};
+
         // Validasi Link
         if (!gomeetLink.trim()) {
             errors.link = 'Link Gomeet wajib diisi';
         } else if (!gomeetLink.trim().includes('meet.google.com')) {
             errors.link = 'Masukkan link Google Meet yang valid';
         }
-        
+
         // Validasi Tanggal
         if (!callDate) {
             errors.date = 'Tanggal call wajib diisi';
@@ -438,14 +524,14 @@ export default function ArtOrderScreen() {
                 }
             }
         }
-        
+
         // Validasi Slot
         if (!callSlot) {
             errors.slot = 'Pilih jadwal jam conference call';
         }
-        
+
         setCallErrors(errors);
-        
+
         if (Object.keys(errors).length > 0) {
             Toast.show({
                 type: 'error',
@@ -454,7 +540,7 @@ export default function ArtOrderScreen() {
             });
             return;
         }
-        
+
         await updateStatus('calling', {
             gomeet_link: gomeetLink.trim(),
             call_date: callDate.trim(),
@@ -484,6 +570,106 @@ export default function ArtOrderScreen() {
             departure_date: departureDate.trim(),
         });
         setShowDepartureModal(false);
+    };
+
+    // ============================================================
+    // ✅ MANAJEMEN KOMPLAIN
+    // ============================================================
+    const fetchComplaints = async (status: string = complaintFilter) => {
+        setComplaintsLoading(true);
+        try {
+            const response = await orderService.getAllComplaints(status);
+            if (response.success) {
+                setComplaints(response.data || []);
+            } else {
+                Toast.show({ type: 'error', text1: 'Gagal', text2: response.message || 'Gagal mengambil data komplain' });
+            }
+        } catch (error) {
+            console.error('Error fetch complaints:', error);
+            Toast.show({ type: 'error', text1: 'Gagal', text2: 'Gagal mengambil data komplain' });
+        } finally {
+            setComplaintsLoading(false);
+        }
+    };
+
+    const openComplaintsModal = () => {
+        setShowComplaintsModal(true);
+        fetchComplaints(complaintFilter);
+    };
+
+    const handleComplaintFilterChange = (status: 'all' | 'pending' | 'approved' | 'rejected') => {
+        setComplaintFilter(status);
+        fetchComplaints(status);
+    };
+
+    const openComplaintDetail = (complaint: Complaint) => {
+        setSelectedComplaint(complaint);
+        setComplaintAdminNote('');
+        setComplaintDiscountPercent('100');
+        setShowComplaintDetail(true);
+    };
+
+    const handleApproveComplaint = async () => {
+        if (!selectedComplaint) return;
+        setProcessingComplaint(true);
+        try {
+            const response = await orderService.approveComplaint(selectedComplaint.id, {
+                admin_note: complaintAdminNote.trim() || undefined,
+                discount_percent: parseFloat(complaintDiscountPercent) || 100,
+            });
+            if (response.success) {
+                Toast.show({ type: 'success', text1: 'Berhasil', text2: 'Komplain disetujui, voucher diterbitkan' });
+                setShowComplaintDetail(false);
+                fetchComplaints(complaintFilter);
+            } else {
+                Toast.show({ type: 'error', text1: 'Gagal', text2: response.message || 'Gagal menyetujui komplain' });
+            }
+        } catch (error: any) {
+            console.error('Error approve complaint:', error);
+            Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error?.response?.data?.message || 'Gagal menyetujui komplain',
+            });
+        } finally {
+            setProcessingComplaint(false);
+        }
+    };
+
+    const handleRejectComplaint = async () => {
+        if (!selectedComplaint) return;
+        setProcessingComplaint(true);
+        try {
+            const response = await orderService.rejectComplaint(selectedComplaint.id, {
+                admin_note: complaintAdminNote.trim() || undefined,
+            });
+            if (response.success) {
+                Toast.show({ type: 'success', text1: 'Berhasil', text2: 'Komplain ditolak' });
+                setShowComplaintDetail(false);
+                fetchComplaints(complaintFilter);
+            } else {
+                Toast.show({ type: 'error', text1: 'Gagal', text2: response.message || 'Gagal menolak komplain' });
+            }
+        } catch (error: any) {
+            console.error('Error reject complaint:', error);
+            Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error?.response?.data?.message || 'Gagal menolak komplain',
+            });
+        } finally {
+            setProcessingComplaint(false);
+        }
+    };
+
+    const getComplaintStatusColor = (status: string) => {
+        const colors: Record<string, string> = { pending: '#F59E0B', approved: '#10B981', rejected: '#EF4444' };
+        return colors[status] || '#6B7280';
+    };
+
+    const getComplaintStatusLabel = (status: string) => {
+        const labels: Record<string, string> = { pending: 'Menunggu Review', approved: 'Disetujui', rejected: 'Ditolak' };
+        return labels[status] || status;
     };
 
     // ============================================================
@@ -576,7 +762,7 @@ export default function ArtOrderScreen() {
     };
 
     // ============================================================
-    // ✅ TABS & STATUS FLOW
+    // ✅ TABS & STATUS FLOW (urutan tampilan)
     // ============================================================
     const filterTabs = [
         { value: 'all', label: 'Semua', count: stats.total, color: '#633594' },
@@ -585,23 +771,24 @@ export default function ArtOrderScreen() {
         { value: 'matching', label: 'Pencocokan', count: stats.matching, color: '#8B5CF6' },
         { value: 'approved', label: 'Disetujui', count: stats.approved, color: '#10B981' },
         { value: 'calling', label: 'Conference', count: stats.calling, color: '#EC4899' },
-        { value: 'working', label: 'Bekerja', count: stats.working, color: '#F97316' },
         { value: 'berangkat_siap_diantar', label: 'Berangkat', count: stats.berangkat, color: '#22C55E' },
+        { value: 'working', label: 'Bekerja', count: stats.working, color: '#F97316' },
         { value: 'rejected_searching', label: 'Ditolak-Cari', count: stats.rejected_searching, color: '#FB923C' },
         { value: 'completed', label: 'Selesai', count: stats.completed, color: '#10B981' },
         { value: 'cancelled', label: 'Batal', count: stats.cancelled, color: '#EF4444' },
     ];
 
+    // working dipindah ke bawah, tepat sebelum completed
     const statusFlow = [
         { value: 'pending', label: 'Menunggu' },
         { value: 'paid', label: 'Dibayar' },
         { value: 'matching', label: 'Pencocokan' },
         { value: 'approved', label: 'Disetujui' },
         { value: 'calling', label: 'Conference Call (Isi Link & Jadwal)' },
-        { value: 'working', label: 'Bekerja' },
         { value: 'berangkat_dari_cicana', label: 'Berangkat dari Cicana' },
         { value: 'berangkat_cek_kesehatan', label: 'Cek Kesehatan' },
         { value: 'berangkat_siap_diantar', label: 'Siap Diantar (Isi Metode & Tanggal)' },
+        { value: 'working', label: 'Bekerja' },
         { value: 'rejected_searching', label: 'Ditolak - Masih Mencari' },
         { value: 'rejected', label: 'Ditolak' },
         { value: 'completed', label: 'Selesai' },
@@ -627,6 +814,12 @@ export default function ArtOrderScreen() {
                         <Text className="text-white/70 text-xs mt-0.5">Kelola pesanan babysitter / ART</Text>
                     </View>
                     <View className="flex-row items-center gap-2">
+                        <TouchableOpacity
+                            onPress={openComplaintsModal}
+                            className="bg-white/15 rounded-full w-9 h-9 items-center justify-center"
+                        >
+                            <MessageSquareWarning size={16} color="#fff" />
+                        </TouchableOpacity>
                         <TouchableOpacity
                             onPress={onRefresh}
                             className="bg-white/15 rounded-full w-9 h-9 items-center justify-center"
@@ -1036,21 +1229,21 @@ export default function ArtOrderScreen() {
             </Modal>
 
             {/* ============================================================
-                ✅ MODAL JADWAL CONFERENCE CALL - FIXED
+                ✅ MODAL JADWAL CONFERENCE CALL
                 ============================================================ */}
             <Modal visible={showCallScheduleModal} transparent animationType="fade" onRequestClose={() => {
                 setShowCallScheduleModal(false);
                 setCallErrors({});
             }}>
-                <Pressable 
-                    className="flex-1 bg-black/50 justify-center items-center px-4" 
+                <Pressable
+                    className="flex-1 bg-black/50 justify-center items-center px-4"
                     onPress={() => {
                         setShowCallScheduleModal(false);
                         setCallErrors({});
                     }}
                 >
-                    <Pressable 
-                        className="bg-white rounded-2xl p-5 w-full max-w-sm max-h-[90%]" 
+                    <Pressable
+                        className="bg-white rounded-2xl p-5 w-full max-w-sm max-h-[90%]"
                         onPress={(e) => e.stopPropagation()}
                     >
                         <ScrollView showsVerticalScrollIndicator={false}>
@@ -1070,7 +1263,7 @@ export default function ArtOrderScreen() {
                                     value={gomeetLink}
                                     onChangeText={(text) => {
                                         setGomeetLink(text);
-                                        setCallErrors(prev => ({...prev, link: undefined}));
+                                        setCallErrors(prev => ({ ...prev, link: undefined }));
                                     }}
                                     placeholder="https://meet.google.com/xxx-xxxx-xxx"
                                     placeholderTextColor="#9CA3AF"
@@ -1082,65 +1275,19 @@ export default function ArtOrderScreen() {
                                 <Text className="text-red-500 text-[10px] mb-2">{callErrors.link}</Text>
                             )}
 
-                            {/* Tanggal Call - Support Web & Mobile */}
+                            {/* Tanggal Call - pakai DateField (native picker di web) */}
                             <Text className="text-[10px] font-bold text-gray-400 mb-1 uppercase">Tanggal Call *</Text>
-                            <View className={`bg-gray-50 rounded-xl border ${callErrors.date ? 'border-red-500' : 'border-gray-100'} px-4 mb-1`}>
-                                <View className="flex-row items-center">
-                                    <Calendar size={16} color="#9CA3AF" />
-                                    
-                                    {/* ✅ WEB: input type date */}
-                                    {Platform.OS === 'web' ? (
-                                        <input
-                                            type="date"
-                                            className="flex-1 py-3 text-gray-700 ml-2 bg-transparent outline-none"
-                                            style={{
-                                                minWidth: 0,
-                                                width: '100%',
-                                                border: 'none',
-                                                outline: 'none',
-                                                fontSize: '14px',
-                                                fontFamily: 'inherit',
-                                            }}
-                                            value={callDate}
-                                            onChange={(e) => {
-                                                setCallDate(e.target.value);
-                                                setCallErrors(prev => ({...prev, date: undefined}));
-                                            }}
-                                            min={getTodayDate()}
-                                            disabled={updating}
-                                        />
-                                    ) : (
-                                        /* ✅ MOBILE: TextInput */
-                                        <TextInput
-                                            className="flex-1 py-3 text-gray-700 ml-2"
-                                            value={callDate}
-                                            onChangeText={(text) => {
-                                                setCallDate(text);
-                                                setCallErrors(prev => ({...prev, date: undefined}));
-                                            }}
-                                            placeholder="YYYY-MM-DD"
-                                            placeholderTextColor="#9CA3AF"
-                                            editable={!updating}
-                                        />
-                                    )}
-                                    
-                                    {/* Tombol Hari Ini */}
-                                    <TouchableOpacity 
-                                        onPress={() => {
-                                            setCallDate(getTodayDate());
-                                            setCallErrors(prev => ({...prev, date: undefined}));
-                                        }}
-                                        className="ml-1 px-2 py-1 bg-purple-100 rounded-lg"
-                                        disabled={updating}
-                                    >
-                                        <Text className="text-[#633594] text-[10px] font-bold">Hari Ini</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                            {callErrors.date && (
-                                <Text className="text-red-500 text-[10px] mb-2">{callErrors.date}</Text>
-                            )}
-                            <Text className="text-[10px] text-gray-400 mb-3">
+                            <DateField
+                                value={callDate}
+                                onChange={(date) => {
+                                    setCallDate(date);
+                                    setCallErrors(prev => ({ ...prev, date: undefined }));
+                                }}
+                                error={callErrors.date}
+                                disabled={updating}
+                                minDate={getTodayDate()}
+                            />
+                            <Text className="text-[10px] text-gray-400 mt-1 mb-3">
                                 Format: YYYY-MM-DD (contoh: {getTodayDate()})
                             </Text>
 
@@ -1152,18 +1299,16 @@ export default function ArtOrderScreen() {
                                         key={slot}
                                         onPress={() => {
                                             setCallSlot(slot);
-                                            setCallErrors(prev => ({...prev, slot: undefined}));
+                                            setCallErrors(prev => ({ ...prev, slot: undefined }));
                                         }}
                                         disabled={updating}
-                                        className={`px-3 py-2 rounded-xl border ${
-                                            callSlot === slot 
-                                                ? 'bg-[#633594] border-[#633594]' 
-                                                : 'bg-gray-50 border-gray-200'
-                                        }`}
+                                        className={`px-3 py-2 rounded-xl border ${callSlot === slot
+                                            ? 'bg-[#633594] border-[#633594]'
+                                            : 'bg-gray-50 border-gray-200'
+                                            }`}
                                     >
-                                        <Text className={`text-xs font-bold ${
-                                            callSlot === slot ? 'text-white' : 'text-gray-600'
-                                        }`}>
+                                        <Text className={`text-xs font-bold ${callSlot === slot ? 'text-white' : 'text-gray-600'
+                                            }`}>
                                             {slot}
                                         </Text>
                                     </Pressable>
@@ -1192,9 +1337,8 @@ export default function ArtOrderScreen() {
                                 <Pressable
                                     onPress={submitCallSchedule}
                                     disabled={updating}
-                                    className={`flex-1 py-3 rounded-xl items-center flex-row justify-center gap-2 ${
-                                        updating ? 'bg-gray-300' : 'bg-[#633594]'
-                                    }`}
+                                    className={`flex-1 py-3 rounded-xl items-center flex-row justify-center gap-2 ${updating ? 'bg-gray-300' : 'bg-[#633594]'
+                                        }`}
                                 >
                                     {updating && <ActivityIndicator size="small" color="#fff" />}
                                     <Text className="font-bold text-white">
@@ -1242,14 +1386,12 @@ export default function ArtOrderScreen() {
                         </View>
 
                         <Text className="text-[10px] font-bold text-gray-400 mb-1 uppercase">Tanggal Keberangkatan</Text>
-                        <View className="bg-gray-50 rounded-xl border border-gray-100 px-4 mb-5">
-                            <TextInput
-                                className="py-3 text-gray-700"
+                        <View className="mb-5">
+                            <DateField
                                 value={departureDate}
-                                onChangeText={setDepartureDate}
-                                placeholder="YYYY-MM-DD"
-                                placeholderTextColor="#9CA3AF"
-                                editable={!updating}
+                                onChange={setDepartureDate}
+                                disabled={updating}
+                                minDate={getTodayDate()}
                             />
                         </View>
 
@@ -1274,7 +1416,171 @@ export default function ArtOrderScreen() {
                 </Pressable>
             </Modal>
 
+            {/* ============================================================
+                ✅ MODAL DAFTAR KOMPLAIN
+                ============================================================ */}
+            <Modal visible={showComplaintsModal} transparent animationType="slide" onRequestClose={() => setShowComplaintsModal(false)}>
+                <View className="flex-1 bg-black/50 justify-end">
+                    <View className="bg-white rounded-t-3xl max-h-[85%]" style={{ paddingBottom: 30 }}>
+                        <View className="flex-row justify-between items-center p-3 border-b border-gray-100">
+                            <Text className="text-base font-bold text-gray-800">Manajemen Komplain</Text>
+                            <TouchableOpacity onPress={() => setShowComplaintsModal(false)} className="p-1.5 bg-gray-100 rounded-full">
+                                <X size={18} color="#6B7280" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-3 py-2">
+                            <View className="flex-row space-x-2">
+                                {(['all', 'pending', 'approved', 'rejected'] as const).map((s) => {
+                                    const active = complaintFilter === s;
+                                    const labels: Record<string, string> = { all: 'Semua', pending: 'Menunggu', approved: 'Disetujui', rejected: 'Ditolak' };
+                                    return (
+                                        <TouchableOpacity
+                                            key={s}
+                                            onPress={() => handleComplaintFilterChange(s)}
+                                            className={`px-3.5 py-2 rounded-2xl ${active ? 'bg-[#633594]' : 'bg-gray-100'}`}
+                                        >
+                                            <Text className={`text-xs font-bold ${active ? 'text-white' : 'text-gray-600'}`}>
+                                                {labels[s]}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </ScrollView>
+
+                        {complaintsLoading ? (
+                            <View className="py-10 items-center">
+                                <ActivityIndicator size="large" color="#633594" />
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={complaints}
+                                keyExtractor={(item) => item.id.toString()}
+                                className="px-3"
+                                contentContainerStyle={{ paddingBottom: 40 }}
+                                ListEmptyComponent={() => (
+                                    <View className="items-center py-10">
+                                        <AlertTriangle size={36} color="#D1D5DB" />
+                                        <Text className="text-gray-400 mt-2 text-sm">Tidak ada komplain</Text>
+                                    </View>
+                                )}
+                                renderItem={({ item }) => (
+                                    <Pressable
+                                        onPress={() => openComplaintDetail(item)}
+                                        className="bg-gray-50 rounded-xl p-3 mb-2 border border-gray-100"
+                                    >
+                                        <View className="flex-row justify-between items-center mb-1">
+                                            <Text className="text-[10px] font-bold text-gray-400">#{item.order_id || item.pesanan_id}</Text>
+                                            <View
+                                                className="px-2.5 py-1 rounded-full"
+                                                style={{ backgroundColor: getComplaintStatusColor(item.status) + '20' }}
+                                            >
+                                                <Text className="text-[9px] font-black" style={{ color: getComplaintStatusColor(item.status) }}>
+                                                    {getComplaintStatusLabel(item.status)}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <Text className="text-sm text-gray-700" numberOfLines={2}>{item.reason}</Text>
+                                        {item.worker_nama && (
+                                            <Text className="text-[11px] text-gray-400 mt-1">Pekerja: {item.worker_nama}</Text>
+                                        )}
+                                    </Pressable>
+                                )}
+                            />
+                        )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* ============================================================
+                ✅ MODAL DETAIL KOMPLAIN
+                ============================================================ */}
+            <Modal visible={showComplaintDetail} transparent animationType="fade" onRequestClose={() => setShowComplaintDetail(false)}>
+                <Pressable className="flex-1 bg-black/50 justify-center items-center px-6" onPress={() => setShowComplaintDetail(false)}>
+                    <Pressable className="bg-white rounded-2xl p-5 w-full max-w-sm" onPress={(e) => e.stopPropagation()}>
+                        <Text className="text-lg font-bold text-gray-800 mb-1">Detail Komplain</Text>
+                        {selectedComplaint && (
+                            <>
+                                <Text className="text-[10px] text-gray-400 mb-3">#{selectedComplaint.order_id || selectedComplaint.pesanan_id}</Text>
+
+                                <View className="bg-gray-50 rounded-xl p-3 mb-3">
+                                    <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">Alasan Komplain</Text>
+                                    <Text className="text-sm text-gray-700">{selectedComplaint.reason}</Text>
+                                </View>
+
+                                {selectedComplaint.status !== 'pending' ? (
+                                    <View className="bg-gray-50 rounded-xl p-3 mb-3">
+                                        <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">Catatan Admin</Text>
+                                        <Text className="text-sm text-gray-700">{selectedComplaint.admin_note || '-'}</Text>
+                                        <Text
+                                            className="text-xs font-bold mt-2"
+                                            style={{ color: getComplaintStatusColor(selectedComplaint.status) }}
+                                        >
+                                            {getComplaintStatusLabel(selectedComplaint.status)}
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <>
+                                        <Text className="text-[10px] font-bold text-gray-400 mb-1 uppercase">Catatan Admin (opsional)</Text>
+                                        <View className="bg-gray-50 rounded-xl border border-gray-100 px-4 mb-3">
+                                            <TextInput
+                                                className="py-3 text-gray-700"
+                                                value={complaintAdminNote}
+                                                onChangeText={setComplaintAdminNote}
+                                                placeholder="Tulis catatan..."
+                                                placeholderTextColor="#9CA3AF"
+                                                multiline
+                                                editable={!processingComplaint}
+                                            />
+                                        </View>
+
+                                        <Text className="text-[10px] font-bold text-gray-400 mb-1 uppercase">
+                                            Diskon Voucher (%) — untuk order berikutnya
+                                        </Text>
+                                        <View className="bg-gray-50 rounded-xl border border-gray-100 px-4 mb-4">
+                                            <TextInput
+                                                className="py-3 text-gray-700"
+                                                value={complaintDiscountPercent}
+                                                onChangeText={setComplaintDiscountPercent}
+                                                keyboardType="numeric"
+                                                placeholder="100"
+                                                placeholderTextColor="#9CA3AF"
+                                                editable={!processingComplaint}
+                                            />
+                                        </View>
+
+                                        <View className="flex-row gap-3">
+                                            <Pressable
+                                                onPress={handleRejectComplaint}
+                                                disabled={processingComplaint}
+                                                className="flex-1 py-3 bg-red-50 rounded-xl items-center flex-row justify-center gap-2"
+                                            >
+                                                {processingComplaint && <ActivityIndicator size="small" color="#EF4444" />}
+                                                <Text className="font-bold text-red-500">Tolak</Text>
+                                            </Pressable>
+                                            <Pressable
+                                                onPress={handleApproveComplaint}
+                                                disabled={processingComplaint}
+                                                className="flex-1 py-3 bg-[#633594] rounded-xl items-center flex-row justify-center gap-2"
+                                            >
+                                                {processingComplaint && <ActivityIndicator size="small" color="#fff" />}
+                                                <Text className="font-bold text-white">Setujui</Text>
+                                            </Pressable>
+                                        </View>
+                                    </>
+                                )}
+
+                                <TouchableOpacity onPress={() => setShowComplaintDetail(false)} className="mt-3 bg-gray-100 py-2.5 rounded-xl">
+                                    <Text className="text-gray-600 font-medium text-center">Tutup</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
             <Toast />
         </View>
     );
-}
+} 

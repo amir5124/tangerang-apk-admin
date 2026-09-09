@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import Toast from "react-native-toast-message";
 import * as XLSX from "xlsx";
+import { withAccess } from "../../src/components/withAccess"; // sesuaikan path relatifnya
 import api from "../../src/utils/api";
 
 const getInitials = (name: string) => {
@@ -56,7 +57,7 @@ const exportToXLSX = (data: any[], tab: string) => {
   }
 };
 
-export default function AdminUserList() {
+function AdminUserList() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
@@ -893,3 +894,5 @@ export default function AdminUserList() {
     </View>
   );
 }
+
+export default withAccess("profile", AdminUserList);

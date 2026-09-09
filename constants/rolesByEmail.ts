@@ -12,14 +12,14 @@ export const EMAIL_ROLE_MAP: Record<string, UserRole> = {
 };
 
 export const ROLE_TABS: Record<UserRole, string[]> = {
-    super_admin: ["index", "myapps", "reports", "orders", "profile", "withdraw"],
+    super_admin: ["index", "myapps", "art-order", "reports", "orders", "profile", "withdraw"],
     admin_aplikasi: ["myapps", "profile"],
     admin_finance: ["reports", "orders", "profile", "withdraw"],
-    admin_art_babysitter: ["art-order"],
+    admin_art_babysitter: ["art-order"], // <-- PASTIKAN "profile" TIDAK ADA DI SINI
 };
 
 export function getRoleByEmail(email: string): UserRole | null {
-    return EMAIL_ROLE_MAP[email.toLowerCase()] ?? null;
+    return EMAIL_ROLE_MAP[email.toLowerCase().trim()] ?? null;
 }
 
 export function canAccessTab(email: string, tab: string): boolean {

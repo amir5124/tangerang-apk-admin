@@ -45,11 +45,7 @@ export default function TabLayout() {
           options={{
             title: "Dashboard",
             tabBarIcon: ({ color, focused }) => (
-              <LayoutDashboard
-                size={24}
-                color={focused ? "#633594" : color}
-                strokeWidth={focused ? 2.5 : 2}
-              />
+              <LayoutDashboard size={24} color={focused ? "#633594" : color} strokeWidth={focused ? 2.5 : 2} />
             ),
           }}
         />
@@ -60,27 +56,18 @@ export default function TabLayout() {
           options={{
             title: "Appku",
             tabBarIcon: ({ color, focused }) => (
-              <Package
-                size={24}
-                color={focused ? "#633594" : color}
-                strokeWidth={focused ? 2.5 : 2}
-              />
+              <Package size={24} color={focused ? "#633594" : color} strokeWidth={focused ? 2.5 : 2} />
             ),
           }}
         />
 
-        {/* Tab 3: ART Order - HANYA UNTUK ADMIN */}
+        {/* Tab 3: ART Order */}
         <Tabs.Screen
           name="art-order"
           options={{
             title: "ART Order",
-
             tabBarIcon: ({ color, focused }) => (
-              <Users
-                size={24}
-                color={focused ? "#633594" : color}
-                strokeWidth={focused ? 2.5 : 2}
-              />
+              <Users size={24} color={focused ? "#633594" : color} strokeWidth={focused ? 2.5 : 2} />
             ),
           }}
         />
@@ -90,13 +77,8 @@ export default function TabLayout() {
           name="reports"
           options={{
             title: "Laporan",
-            href: can('reports') ? "/reports" : null,
             tabBarIcon: ({ color, focused }) => (
-              <SquareMenu
-                size={24}
-                color={focused ? "#633594" : color}
-                strokeWidth={focused ? 2.5 : 2}
-              />
+              <SquareMenu size={24} color={focused ? "#633594" : color} strokeWidth={focused ? 2.5 : 2} />
             ),
           }}
         />
@@ -106,13 +88,8 @@ export default function TabLayout() {
           name="orders"
           options={{
             title: "Pesanan",
-            href: can('orders') ? "/orders" : null,
             tabBarIcon: ({ color, focused }) => (
-              <ShoppingCart
-                size={24}
-                color={focused ? "#633594" : color}
-                strokeWidth={focused ? 2.5 : 2}
-              />
+              <ShoppingCart size={24} color={focused ? "#633594" : color} strokeWidth={focused ? 2.5 : 2} />
             ),
           }}
         />
@@ -123,16 +100,10 @@ export default function TabLayout() {
           options={{
             title: "Profil",
             tabBarIcon: ({ color, focused }) => (
-              <User
-                size={24}
-                color={focused ? "#633594" : color}
-                strokeWidth={focused ? 2.5 : 2}
-              />
+              <User size={24} color={focused ? "#633594" : color} strokeWidth={focused ? 2.5 : 2} />
             ),
           }}
         />
-
-
       </Tabs>
     </SessionContext.Provider>
   );
